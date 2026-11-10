@@ -1,184 +1,154 @@
 # 🌐 Sabro Networks &bull; FTTH Telecom & Operations Management System
 
-[![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/Flask-3.x-black.svg?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
-[![Vercel Ready](https://img.shields.io/badge/Vercel-Serverless%20Ready-black.svg?logo=vercel&logoColor=white)](https://vercel.com/)
-[![Render Ready](https://img.shields.io/badge/Render-Free%20Hosting-46E3B7.svg?logo=render&logoColor=white)](https://render.com/)
-[![Tests](https://img.shields.io/badge/Tests-24%2F24%20Passing%20(100%25)-success.svg)](#-test-suite)
-[![License](https://img.shields.io/badge/License-Proprietary-orange.svg)](#)
+<div align="center">
 
-An enterprise-grade, sober, and elegant operations platform designed specifically for FTTH (Fiber-To-The-Home) Internet Service Providers. Built to replace cluttered legacy panels with high-efficiency, role-segregated operational desks for NOC Admins, Field Technicians, and Bill Recovery Agents.
+[![CI Pipeline](https://img.shields.io/badge/CI%20Pipeline-Passing-2ea44f?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/vshatkaysolutions-alt/Sabro-Networks/actions)
+[![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776ab?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-3.x-000000?style=flat-square&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![Render Ready](https://img.shields.io/badge/Render-Blueprint%20Enabled-46e3b7?style=flat-square&logo=render&logoColor=white)](https://render.com/)
+[![Tests](https://img.shields.io/badge/Tests-24%2F24%20Passing%20(100%25)-brightgreen?style=flat-square)](#-automated-testing)
 
----
+**A high-performance operations, ticketing, and billing recovery platform designed specifically for FTTH (Fiber-To-The-Home) Internet Service Providers.**
 
-## 🚀 Key Architectural Highlights
+[Key Features](#-key-features) &bull; [Architecture](#-system-architecture) &bull; [Demo Logins](#-demo-credentials) &bull; [Deploy to Render](#-deploy-to-render) &bull; [Local Setup](#-local-development)
 
-* **🎯 100% Role-Isolated Desks**:
-  * **Admin / NOC Supervisor**: Dedicated Complaints Queue, Optical telemetry indicators, technician dispatch, capacity duty roster, capital investments, and full system management. Zero irrelevant billing or dealer clutter on the primary dashboard.
-  * **Complaint Boy (Field Fiber Technician)**: Isolated work orders desk showing only assigned fiber faults, drop line lookups, optical core colors, and an integrated gamified XP leveling system (Tiers 1–5).
-  * **Recovery Boy (Field Collector)**: Dedicated dues recovery desk, pending amounts, 1-click cash collection with instant subscriber validity extension, and friendly Roman Urdu WhatsApp reminders.
-* **⚡ 1-Click Telecom WhatsApp Automations**:
-  * **Customer Bill Reminders**: Short, polite, and friendly Roman Urdu notifications with zero tech/hardware dumps.
-  * **Field Tech Dispatch**: Pre-formatted ticket details (FDB box, drop fiber core color, subscriber address) delivered directly to technician WhatsApp.
-  * **Restoration Notice**: Automated ticket resolved messages sent directly to subscribers upon fiber splice completion.
-  * **Bulk Defaulters Summary**: Generates a consolidated recovery list with single-tap messaging.
-* **🌐 FTTH Physical Plant Tracking**:
-  * Tracks ONU Serials, Fiber Distribution Boxes (FDB), Pole numbers, CNIC records, and Drop Fiber Cores (Blue, Orange, Green, Brown) with visual color badges.
-* **🛡️ Security & Enterprise Concurrency**:
-  * SQLite configured with **Write-Ahead Logging (WAL)** and 25s busy timeout for high-concurrency environments.
-  * Auto-detects serverless platforms (Vercel) and handles storage gracefully in `/tmp`.
-  * PBKDF2/scrypt cryptographic password hashing with automatic legacy upgrade.
-  * `HttpOnly` and `SameSite=Lax` session cookie protection.
-  * Safe live binary database backups via SQLite Backup API.
+</div>
 
 ---
 
-## 👥 Default Demo Credentials
+## 🏛️ System Architecture
 
-| Role | Username | Password | Dedicated Focus & Desk |
+```mermaid
+flowchart TD
+    subgraph SabroPortal["Sabro Networks Operations Portal"]
+        Admin["Admin / NOC Supervisor\n• Active Outages Telemetry\n• 1-Click Tech Dispatch\n• Staff Duty Roster\n• Zero Billing Clutter"]
+        Tech["Complaint Boy (Field Tech)\n• Assigned Fiber Faults\n• Drop Fiber Line Lookup\n• Gamified Tier 1-5 XP Leveling"]
+        Recovery["Recovery Boy (Field Collector)\n• Unpaid Dues Queue\n• 1-Click Cash Receipts\n• Friendly Roman Urdu WhatsApp Alerts"]
+    end
+
+    Admin -->|"Assigns Ticket"| Tech
+    Admin -->|"Reviews Dues"| Recovery
+    Tech -->|"Resolves Splice"| DB[("SQLite Database\n(WAL Mode & Concurrency)")]
+    Recovery -->|"Collects Cash"| DB
+```
+
+---
+
+## ✨ Key Features
+
+### 1. Dedicated, Role-Segregated Desks
+* **NOC Complaints Desk (Admin)**: Focused entirely on open subscriber tickets, optical telemetry indicators, technician dispatch, and engineering duty rosters. Non-operational dealer sync and financial tables are segregated to preserve focus.
+* **Technician Desk (Complaint Boy)**: Shows only assigned work orders. Includes drop wire details (FDB box number, pole location, optical fiber core color: Blue, Orange, Green, Brown), resolution notes, and gamified XP progression across 5 technician tiers.
+* **Recovery Desk (Recovery Boy)**: Streamlined field collection interface showing pending subscriber dues, one-tap cash collection with automatic 30-day validity extension, and single-click friendly WhatsApp reminders.
+
+### 2. Telecom WhatsApp Automations
+* **Polite Bill Reminders**: Short, friendly Roman Urdu messages without technical or hardware jargon.
+* **Field Tech Dispatch**: Automatically sends full subscriber location, optical box, and fiber color to field technicians.
+* **Customer Restoration Alerts**: Instant resolution confirmations sent to customers upon ticket completion.
+* **Defaulters Summary**: Rapid overview of overdue accounts with direct WhatsApp contact buttons.
+
+### 3. Enterprise-Grade Reliability
+* **High-Concurrency SQLite**: Configured with Write-Ahead Logging (`WAL`), 25-second busy timeout, and automatic database backups.
+* **Universal Cloud Compatibility**: Built with automatic detection for serverless filesystems and long-running production processes.
+* **Cryptographic Security**: Passwords hashed with scrypt/PBKDF2 with automatic in-place upgrades.
+
+---
+
+## 👥 Demo Credentials
+
+| Role | Username | Password | Operational Access |
 | :--- | :--- | :--- | :--- |
-| **Admin** | `admin` | `admin123` | Full NOC & complaints desk, staff roster, packages, backups |
-| **Complaint Boy** | `rashid.tech` | `tech123` | Field technician work orders, fiber lookup, resolve tickets |
-| **Recovery Boy** | `tariq.rec` | `rec123` | Unpaid dues recovery desk, cash collections, Roman Urdu reminders |
+| **Admin (Owner)** | `admin` | `admin123` | Full NOC desk, complaints queue, capacity roster, financial records, backups |
+| **Technician (Complaint Boy)** | `rashid.tech` | `tech123` | Assigned fiber fault work orders, fiber lookup, ticket resolution & XP |
+| **Recovery Boy** | `tariq.rec` | `rec123` | Unpaid dues recovery, cash receipt logging, Roman Urdu WhatsApp reminders |
 
 ---
 
-## ☁️ 100% Free Cloud Deployment Guide
+## 🚀 Deploy to Render (100% Free)
 
-You can deploy Sabro Networks for **free** with a **free SSL domain** without needing a credit card.
+You can launch Sabro Networks with a free domain on [Render](https://render.com/) with zero credit card:
 
-### Option A: Deploy on Vercel (Fastest & 100% Free Domain)
-1. Push your repository to **GitHub** using `UPLOAD_TO_GITHUB.bat`.
-2. Go to **[vercel.com](https://vercel.com/)** and sign in with your GitHub account.
-3. Click **"Add New..."** &rarr; **"Project"**.
-4. Select your `sabro-networks` repository and click **"Import"**.
-5. Keep default settings (Vercel automatically detects `vercel.json` and `api/index.py`).
-6. Click **"Deploy"**.
-7. In ~30 seconds, your site will be live on a free domain like: `https://sabro-networks.vercel.app`.
-
-### Option B: Deploy on Render (Recommended for Long-Running ISP Services)
-1. Push your repository to **GitHub**.
+1. Push this repository to your GitHub account.
 2. Go to **[render.com](https://render.com/)** and sign in with GitHub.
-3. Click **"New +"** &rarr; **"Web Service"**.
-4. Select your repository.
-5. Render automatically reads `render.yaml` or you can select:
-   * **Environment**: `Python`
-   * **Build Command**: `pip install -r requirements.txt`
-   * **Start Command**: `gunicorn wsgi:app`
-6. Choose the **Free** tier and click **"Create Web Service"**.
-7. Your portal will be live on a free SSL domain like: `https://sabro-networks.onrender.com`.
+3. Click **"New +"** &rarr; Select **"Blueprint"**.
+4. Choose your `Sabro-Networks` repository.
+5. Render reads the included `render.yaml` configuration and provisions the web service.
+6. Click **"Apply"** &mdash; your site will be live on an SSL domain (`https://sabro-networks-portal.onrender.com`) with automated Git deploys enabled.
 
 ---
 
-## 💻 Tech Stack
+## 💻 Local Development
 
-* **Backend**: Python 3.10+, Flask 3.x
-* **Database**: SQLite 3 with WAL Journaling (`PRAGMA journal_mode=WAL;`)
-* **Frontend**: Bootstrap 5.3, Bootstrap Icons, Plus Jakarta Sans & JetBrains Mono typography, Chart.js
-* **Server Engines**: Vercel Serverless (Cloud), Gunicorn (Linux/Render), Waitress (Windows/Production), Flask WSGI (Development)
+### Prerequisites
+* Python 3.10, 3.11, or 3.12
+* Git
 
----
-
-## ⚡ Local Setup
-
-### 1. Clone the Repository
+### Installation
 ```bash
-git clone https://github.com/your-username/sabro-networks-portal.git
-cd sabro-networks-portal
-```
+# 1. Clone the repository
+git clone https://github.com/vshatkaysolutions-alt/Sabro-Networks.git
+cd Sabro-Networks
 
-### 2. Set Up Virtual Environment
-```bash
-# Windows
+# 2. Create and activate a virtual environment
 python -m venv venv
-.\venv\Scripts\activate
+.\venv\Scripts\activate   # On Windows
+source venv/bin/activate  # On Linux / macOS
 
-# Linux / macOS
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 3. Install Dependencies
-```bash
+# 3. Install dependencies
 pip install -r requirements.txt
-```
 
-### 4. Initialize Database
-```bash
-# Initializes tables, performance indexes, and default seed staff
+# 4. Initialize database schema and default seed data
 python init_db.py
-```
 
-### 5. Launch the Application
-```bash
-# Development Server
+# 5. Launch the application
 python app.py
-
-# Production Server (Windows)
-waitress-serve --listen=0.0.0.0:5000 app:app
-
-# Production Server (Linux)
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ```
 
-Open your browser at **`http://127.0.0.1:5000`** and log in with any of the demo accounts listed above.
+The portal will be running locally at **`http://127.0.0.1:5000`**.
 
 ---
 
-## 🧪 Test Suite
+## 🧪 Automated Testing
 
-The system includes 24 regression, security, role-boundary, and lifecycle unit tests:
+All 24 unit, security, and integration tests can be executed locally with:
 
 ```bash
 python -m unittest test_security_suite.py test_enterprise_suite.py test_company_system.py
 ```
 
-### Test Coverage Highlights
-* `[PASS]` Clean digital bill slip verification (zero PPPoE/hardware clutter).
-* `[PASS]` Role isolation barriers (Recovery Boy and Complaint Boy boundaries).
-* `[PASS]` FTTH subscriber lifecycle (Creation, FTTH specs, Deposit, Edit).
-* `[PASS]` 6 Telecom WhatsApp automations (Welcome, Reminder, Invoice, Dispatch, Resolution, Defaulters).
-* `[PASS]` Gamified technician leveling system (Tiers 1–5, +XP on resolve).
-* `[PASS]` Automated database backup integrity.
+### Verified Test Criteria
+* `[PASS]` Clean digital bill slip verification (zero PPPoE or hardware clutter).
+* `[PASS]` Strict role boundary enforcement between Admin, Technician, and Recovery staff.
+* `[PASS]` Complete FTTH subscriber lifecycle (Creation, hardware parameters, deposits, edits).
+* `[PASS]` 6 Telecom WhatsApp automation endpoints.
+* `[PASS]` Gamified technician progression levels (Tiers 1–5).
+* `[PASS]` Atomic database backup creation and download integrity.
 
 ---
 
-## 📁 Project Structure
+## 📁 Repository Structure
 
 ```text
+├── .github/
+│   ├── workflows/ci.yml       # GitHub Actions automated test runner
+│   └── ISSUE_TEMPLATE/        # Standardized issue and bug report forms
 ├── api/
-│   └── index.py               # Vercel serverless function entrypoint
-├── app.py                     # Main Flask application & route controllers
-├── db.py                      # Database schema, migrations, connection pool & seeds
-├── init_db.py                 # CLI database initializer & seeder
-├── dealer_client.py           # Upstream Connect Communications integration
-├── templates/                 # Jinja2 template views
-│   ├── base.html              # Sober corporate layout with role-specific navigation
-│   ├── dashboard.html         # Multi-role dashboard (NOC, Tech Desk, Recovery Desk)
-│   ├── login.html             # High-contrast corporate login screen
-│   ├── customers.html         # FTTH subscriber management & optical parameters
-│   ├── invoices.html          # Invoices & billing recovery desk
-│   ├── tickets.html           # Complaint tickets management & technician assignment
-│   ├── staff.html             # Staff accounts & PFP management
-│   ├── expenses.html          # Daily expense tracker (Kharcha)
-│   ├── investments.html       # Capital investment tracker
-│   ├── tariffs.html           # FTTH speed packages & tariffs
-│   └── settings.html          # ISP branding & WhatsApp configuration
-├── static/                    # Static assets
-│   ├── img/                   # Logos, default SVG avatars, favicon
-│   └── uploads/pfp/           # User profile picture upload destination
-├── vercel.json                # Vercel deployment & routing configuration
-├── render.yaml                # Render cloud deployment configuration
-├── Procfile                   # Cloud web service process definition
-├── requirements.txt           # Python package dependencies
-├── .env.example               # Environment variables template
-├── .gitignore                 # Production Git ignore rules
-└── test_*.py                  # Automated test suites
+│   └── index.py               # Cloud serverless compatibility entrypoint
+├── app.py                     # Main application logic and route handlers
+├── db.py                      # Database schema, migrations, connection pool
+├── init_db.py                 # CLI database initializer and seeder
+├── render.yaml                # Render Blueprint automated deployment config
+├── requirements.txt           # Pinned Python package dependencies
+├── templates/                 # Responsive HTML views (Bootstrap 5.3)
+├── static/                    # Icons, SVG avatars, logos
+├── START_AUTO_SYNC.bat        # Background watcher for automatic GitHub pushes
+├── QUICK_PUSH.bat             # 1-click manual commit and push utility
+└── test_*.py                  # 24-test verification suite
 ```
 
 ---
 
-## 📜 License & Ownership
+## 📄 License & Attribution
 
-Developed for **Sabro Networks (FTTH)** in partnership with **Vshatkay Solutions Agency**.
+Developed for **Sabro Networks (FTTH)** in partnership with **Vshatkay Solutions Agency**.  
 All rights reserved.

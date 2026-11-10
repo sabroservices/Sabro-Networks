@@ -1,0 +1,32 @@
+name: Bug report
+description: Create a report to help us improve Sabro Networks ISP Portal
+title: "[BUG] "
+labels: ["bug"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue! Please describe the bug clearly below.
+  - type: input
+    id: context
+    attributes:
+      label: Operating Module
+      description: Which portal section had the issue? (e.g., NOC Dashboard, Field Tech Desk, WhatsApp Reminders)
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the behavior you observed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen instead?
+    validations:
+      required: true
