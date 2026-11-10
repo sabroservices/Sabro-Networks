@@ -26,7 +26,7 @@ if not exist "!GIT_PATH!" (
 )
 
 echo [1/3] Linked Repository:
-set "REPO_URL=https://github.com/vshatkaysolutions-alt/Sabro-Networks.git"
+set "REPO_URL=https://github.com/sabroservices/Sabro-Networks.git"
 echo %REPO_URL%
 echo.
 
@@ -45,13 +45,13 @@ if %errorlevel% equ 0 (
     echo.
     echo =====================================================================
     echo   [SUCCESS] Your repository has been pushed to GitHub successfully!
-    echo   Visit: https://github.com/vshatkaysolutions-alt/Sabro-Networks
+    echo   Visit: https://github.com/sabroservices/Sabro-Networks
     echo =====================================================================
 ) else (
     echo.
     echo =====================================================================
     echo   [NOTE] If authentication failed, please verify you have write
-    echo   access to vshatkaysolutions-alt/Sabro-Networks, or sign in via browser.
+    echo   access to sabroservices/Sabro-Networks, or sign in via browser.
     echo =====================================================================
 )
 

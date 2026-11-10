@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![CI Pipeline](https://img.shields.io/badge/CI%20Pipeline-Passing-2ea44f?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/vshatkaysolutions-alt/Sabro-Networks/actions)
+[![CI Pipeline](https://img.shields.io/badge/CI%20Pipeline-Passing-2ea44f?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/sabroservices/Sabro-Networks/actions)
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776ab?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-3.x-000000?style=flat-square&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![Render Ready](https://img.shields.io/badge/Render-Blueprint%20Enabled-46e3b7?style=flat-square&logo=render&logoColor=white)](https://render.com/)
@@ -86,7 +86,7 @@ You can launch Sabro Networks with a free domain on [Render](https://render.com/
 ### Installation
 ```bash
 # 1. Clone the repository
-git clone https://github.com/vshatkaysolutions-alt/Sabro-Networks.git
+git clone https://github.com/sabroservices/Sabro-Networks.git
 cd Sabro-Networks
 
 # 2. Create and activate a virtual environment
