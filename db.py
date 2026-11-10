@@ -10,8 +10,8 @@ else:
     DB_PATH = os.environ.get("SABRO_DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "sabro_isp.db"))
 
 def get_db():
-    # Auto-initialize database on cold start in serverless environments
-    if is_serverless and not os.path.exists(DB_PATH):
+    # Auto-initialize database on boot if file is missing (e.g. freshly cloned repo)
+    if not os.path.exists(DB_PATH):
         init_db(force_reset=False)
 
     conn = sqlite3.connect(DB_PATH, timeout=25.0)
