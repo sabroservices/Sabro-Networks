@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block page_title %}Page Not Found (404){% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-6 text-center">
+        <div class="stat-card p-5">
+            <img src="{{ url_for('static', filename='img/sabro_logo.jpg') }}" alt="Sabro Networks" class="rounded-circle mb-3 shadow" style="width: 72px; height: 72px; object-fit: cover; border: 2px solid #ea580c;">
+            <h1 class="display-4 fw-bold text-dark">404</h1>
+            <h4 class="fw-bold mb-2">Requested Page Not Found</h4>
+            <p class="text-muted mb-4">
+                The link you followed may be broken or the resource has been moved. Check the URL or return to the main dashboard.
+            </p>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-orange px-4 py-2 shadow-sm">
+                <i class="bi bi-speedometer2 me-1"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

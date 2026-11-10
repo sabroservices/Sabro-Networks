@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block page_title %}Staff & User Logins Management{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3 mb-4">
+    <!-- Instant Live Search & Add Staff -->
+    <div class="input-group flex-grow-1" style="max-width: 540px;">
+        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-warning"></i></span>
+        <input type="text" id="staffSearch" class="form-control border-start-0" placeholder="Type here to search staff name, username, role, area...">
+    </div>
+
+    <button class="btn btn-orange shadow-sm flex-grow-1 flex-md-grow-0" data-bs-toggle="modal" data-bs-target="#addStaffModal">
+        <i class="bi bi-person-plus-fill me-1"></i> Add New Staff Login
+    </button>
+</div>
+
+<!-- Staff Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4">
+        <div class="stat-card">
+            <div class="text-muted small fw-semibold text-uppercase">Total Registered Staff</div>
+            <div class="fs-4 fw-bold mt-1 text-dark">{{ staff_members|length }}</div>
+            <div class="small text-muted mt-1"><i class="bi bi-shield-check text-success"></i> Active logins & roles</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="stat-card border-success">
+            <div class="text-muted small fw-semibold text-uppercase">Total Field Collections</div>
+            <div class="fs-4 fw-bold mt-1 text-success">
+                {% set total_staff_collected = staff_members|map(attribute='total_collected')|sum %}
+                {{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(total_staff_collected) }}
+            </div>
+            <div class="small text-success mt-1"><i class="bi bi-cash-stack"></i> Recovered by boys</div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="stat-card">
+            <div class="text-muted small fw-semibold text-uppercase">Active Ticket Assignments</div>
+            <div class="fs-4 fw-bold mt-1 text-dark">
+                {% set total_active_assigned = staff_members|map(attribute='assigned_tickets')|sum %}
+                {{ total_active_assigned }} Open Tasks
+            </div>
+            <div class="small text-warning mt-1"><i class="bi bi-tools"></i> Assigned to complain boys</div>
+        </div>
+    </div>
+</div>
+
+<!-- Staff Directory Table -->
+<div class="table-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-people-fill text-warning me-2"></i> Staff & Login Credentials Directory (<span id="staffCountBadge" class="fw-bold">{{ staff_members|length }}</span>)</span>
+        <span class="badge badge-orange">Access Control & Levels</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="staffTable">
+            <thead class="table-light small">
+                <tr>
+                    <th>Staff Member & Avatar</th>
+                    <th>Role & Level</th>
+                    <th>Login Password</th>
+                    <th>Contact Phone</th>
+                    <th>Assigned Area</th>
+                    <th>Status</th>
+                    <th>Total Recovered</th>
+                    <th>Complaints / Field Ops</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in staff_members %}
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <img src="{{ s.avatar_url }}" alt="Avatar" class="rounded-circle shadow-sm flex-shrink-0" style="width: 38px; height: 38px; object-fit: cover; border: 2px solid {% if s.role == 'Admin' %}#ea580c{% elif s.role == 'Complaint Boy' %}#f59e0b{% elif s.role == 'Recovery Boy' %}#10b981{% else %}#cbd5e1{% endif %};">
+                            <div>
+                                <div class="fw-bold text-dark">{{ s.full_name }}</div>
+                                <div class="small font-monospace text-primary">
+                                    <span class="clickable-copy" onclick="copyToClipboard('{{ s.username }}', 'Staff Username')" title="Click to copy">@{{ s.username }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if s.role == 'Admin' %}
+                            <span class="badge bg-dark text-white"><i class="bi bi-shield-lock-fill me-1"></i> Admin</span>
+                        {% elif s.role == 'Complaint Boy' %}
+                            <div>
+                                <span class="badge bg-warning text-dark"><i class="bi bi-tools me-1"></i> Complain Boy</span>
+                                <span class="badge bg-dark text-warning border border-warning fw-bold ms-1">LVL {{ s.level_info.level }}</span>
+                                <div class="small text-muted" style="font-size: 0.72rem;">{{ s.level_info.title }}</div>
+                            </div>
+                        {% elif s.role == 'Recovery Boy' %}
+                            <span class="badge bg-success"><i class="bi bi-cash-coin me-1"></i> Recovery Boy</span>
+                        {% else %}
+                            <span class="badge bg-light text-dark border">{{ s.role }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="font-monospace text-muted small">
+                            <i class="bi bi-shield-lock-fill text-secondary me-1"></i>••••••••
+                        </span>
+                    </td>
+                    <td>
+                        <div class="small fw-semibold d-flex align-items-center gap-1">
+                            <span class="clickable-copy" onclick="copyToClipboard('{{ s.phone }}', 'Staff Phone')" title="Click to copy">{{ s.phone or 'Not set' }}</span>
+                            {% if s.phone %}
+                                <a href="https://wa.me/{{ clean_whatsapp_phone(s.phone) }}" target="_blank" class="text-success ms-1" title="WhatsApp Staff">
+                                    <i class="bi bi-whatsapp"></i>
+                                </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="small"><i class="bi bi-geo-alt text-danger me-1"></i> {{ s.assigned_area or 'All Sectors' }}</div>
+                    </td>
+                    <td>
+                        {% if s.status == 'Active' %}
+                            <span class="badge badge-active"><i class="bi bi-check-circle-fill me-1"></i> Active</span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 text-dark">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="fw-bold text-success">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(s.total_collected or 0) }}</div>
+                    </td>
+                    <td>
+                        {% if s.role == 'Complaint Boy' %}
+                            <div class="small fw-bold text-success"><i class="bi bi-check-circle-fill me-1"></i>{{ s.resolved_tickets or 0 }} Resolved</div>
+                            <div class="small text-danger">
+                                {% if s.assigned_tickets and s.assigned_tickets > 0 %}
+                                    <span class="badge bg-danger">{{ s.assigned_tickets }} Open</span>
+                                {% else %}
+                                    <span class="badge bg-light text-secondary border">0 Open</span>
+                                {% endif %}
+                            </div>
+                        {% elif s.role == 'Recovery Boy' %}
+                            <div class="small text-muted"><i class="bi bi-bicycle text-success me-1"></i>Recovery Agent</div>
+                        {% else %}
+                            <span class="badge bg-light text-secondary border">Full NOC Ops</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <div class="d-inline-flex gap-1 flex-nowrap">
+                            <!-- Edit Staff Button -->
+                            <button type="button" class="btn btn-sm btn-outline-warning text-dark" data-bs-toggle="modal" data-bs-target="#editStaffModal{{ s.id }}" title="Edit Staff & PFP">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+
+                            <!-- Delete Staff -->
+                            {% if s.id != session.get('user_id') %}
+                            <form action="{{ url_for('delete_staff', id=s.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete staff account for {{ s.full_name }} (@{{ s.username }})?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-center py-4 text-muted">No staff members found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ================= EDIT STAFF MODALS (OUTSIDE TABLE) ================= -->
+{% for s in staff_members %}
+<div class="modal fade" id="editStaffModal{{ s.id }}" tabindex="-1" style="text-align: left;">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <form action="{{ url_for('edit_staff', id=s.id) }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi bi-pencil-square me-2" style="color: #ea580c;"></i> Edit Staff: {{ s.full_name }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- Current Avatar Preview & New Upload -->
+                    <div class="mb-3 p-3 bg-light rounded-3 border d-flex align-items-center gap-3">
+                        <img src="{{ s.avatar_url }}" alt="PFP" class="rounded-circle shadow-sm flex-shrink-0" style="width: 52px; height: 52px; object-fit: cover; border: 2.5px solid #ea580c;">
+                        <div class="flex-grow-1">
+                            <label class="form-label fw-bold small mb-1">Update Profile Picture (PFP)</label>
+                            <input type="file" name="pfp_file" class="form-control form-control-sm" accept="image/png,image/jpeg,image/webp,image/gif">
+                            <div class="form-text small text-muted" style="font-size: 0.72rem;">Leave empty to keep current picture.</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Full Name *</label>
+                        <input type="text" name="full_name" class="form-control" value="{{ s.full_name }}" required>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Login Username *</label>
+                            <input type="text" name="username" class="form-control font-monospace" value="{{ s.username }}" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Login Password</label>
+                            <input type="password" name="password" class="form-control font-monospace" placeholder="Leave blank to keep current">
+                            <div class="form-text small text-muted">Only fill if resetting password.</div>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Role / Designation *</label>
+                            <select name="role" class="form-select" required>
+                                <option value="Admin" {% if s.role == 'Admin' %}selected{% endif %}>Admin (Full Access)</option>
+                                <option value="Complaint Boy" {% if s.role == 'Complaint Boy' %}selected{% endif %}>Complaint Boy (Technician)</option>
+                                <option value="Recovery Boy" {% if s.role == 'Recovery Boy' %}selected{% endif %}>Recovery Boy (Billing Collector)</option>
+                                <option value="Staff" {% if s.role == 'Staff' %}selected{% endif %}>General Staff</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Status *</label>
+                            <select name="status" class="form-select">
+                                <option value="Active" {% if s.status == 'Active' %}selected{% endif %}>Active</option>
+                                <option value="Inactive" {% if s.status == 'Inactive' %}selected{% endif %}>Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Phone Number *</label>
+                            <input type="text" name="phone" class="form-control" value="{{ s.phone }}" required placeholder="0300-1234567">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Assigned Sector / Area</label>
+                            <input type="text" name="assigned_area" class="form-control" value="{{ s.assigned_area or '' }}" placeholder="e.g. Sector B">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background-color: #f8fafc;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-orange px-4"><i class="bi bi-check-lg me-1"></i> Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Add Staff Modal -->
+<div class="modal fade" id="addStaffModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <form action="{{ url_for('add_staff') }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi bi-person-plus-fill me-2" style="color: #ea580c;"></i> Add Staff / User Login
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Staff Full Name *</label>
+                        <input type="text" name="full_name" class="form-control" required placeholder="e.g. Farhan Ali">
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Login Username *</label>
+                            <input type="text" name="username" class="form-control font-monospace" required placeholder="e.g. farhan.tech">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Login Password *</label>
+                            <input type="text" name="password" class="form-control font-monospace" required value="pass123">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Role / Designation *</label>
+                            <select name="role" class="form-select" required>
+                                <option value="Complaint Boy">Complaint Boy (Technician)</option>
+                                <option value="Recovery Boy">Recovery Boy (Billing Collector)</option>
+                                <option value="Staff">General Staff</option>
+                                <option value="Admin">Admin (Full Access)</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Status *</label>
+                            <select name="status" class="form-select">
+                                <option value="Active" selected>Active</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Contact Phone *</label>
+                            <input type="text" name="phone" class="form-control" required placeholder="0300-1234567">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Assigned Area / Sector</label>
+                            <input type="text" name="assigned_area" class="form-control" placeholder="e.g. Sector A & C">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Profile Picture (PFP)</label>
+                        <input type="file" name="pfp_file" class="form-control" accept="image/png,image/jpeg,image/webp,image/gif">
+                        <div class="form-text small text-muted">Upload avatar image (optional). Role fallback SVG used if empty.</div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background-color: #f8fafc;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-orange px-4"><i class="bi bi-check-lg me-1"></i> Register Staff Login</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Attach Instant Live Search on Staff Table with Counter Badge
+    attachLiveSearch('staffSearch', 'staffTable', 'staffCountBadge');
+</script>
+{% endblock %}

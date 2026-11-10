@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block page_title %}Connect Dealer Panel Integration & Auto-Sync{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1 text-dark">
+            <i class="bi bi-cloud-arrow-down-fill text-warning me-2"></i> Connect Dealer Panel Sync Hub
+        </h4>
+        <p class="text-muted mb-0">
+            Automatically ingest subscriber accounts, PPPoE credentials, expiry date extensions, and package speed profiles from your upstream dealer portal.
+        </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <form action="{{ url_for('dealer_sync_run') }}" method="POST" id="dealerSyncForm">
+            <button type="submit" class="btn btn-orange shadow-sm fw-bold px-3 py-2" id="syncRunBtn">
+                <i class="bi bi-arrow-repeat me-1" id="syncRunIcon"></i> Pull & Sync Data Now
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- 4 Sync Status Metric Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card border-success">
+            <div class="text-success small fw-bold text-uppercase d-flex justify-content-between">
+                <span><i class="bi bi-shield-check me-1"></i> Sync Status</span>
+                <span class="pulse-indicator"></span>
+            </div>
+            <div class="fs-5 fw-bold mt-1 text-dark text-truncate">{{ config.last_sync_status or 'Ready to Sync' }}</div>
+            <div class="small text-muted mt-1"><i class="bi bi-clock-history"></i> Updated in real-time</div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="text-muted small fw-bold text-uppercase"><i class="bi bi-calendar-check text-primary me-1"></i> Last Synced At</div>
+            <div class="fs-5 fw-bold mt-1 text-dark text-truncate">{{ config.last_sync_time or 'Never Synced' }}</div>
+            <div class="small text-muted mt-1">Automated reconciliation</div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="text-muted small fw-bold text-uppercase"><i class="bi bi-person-badge text-warning me-1"></i> Dealer Username</div>
+            <div class="fs-5 fw-bold mt-1 text-dark font-monospace text-truncate">@{{ config.dealer_username or 'sabro.dealer' }}</div>
+            <div class="small text-muted mt-1">Connect Communications</div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="stat-card border-primary">
+            <div class="text-primary small fw-bold text-uppercase"><i class="bi bi-journal-text me-1"></i> Audit Logs</div>
+            <div class="fs-5 fw-bold mt-1 text-dark">{{ logs|length }} Sync Events</div>
+            <div class="small text-muted mt-1">Total reconciliation history</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Left Column: Dealer Portal Web Connector -->
+    <div class="col-lg-6">
+        <div class="table-card p-4 h-100 d-flex flex-column justify-content-between">
+            <div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-globe2 text-warning me-2"></i> Dealer Portal Credentials & Web Connector
+                    </h5>
+                    <span class="badge badge-orange">Live Connector</span>
+                </div>
+                <p class="text-muted small mb-4">
+                    Configure your upstream Connect Communications franchise portal credentials. Sabro Networks uses these to securely authenticate and fetch updated subscriber lists and renewals.
+                </p>
+
+                <form action="{{ url_for('dealer_sync_save_config') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Dealer Portal Login URL *</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border"><i class="bi bi-link-45deg"></i></span>
+                            <input type="url" name="portal_url" class="form-control font-monospace" value="{{ config.portal_url or 'https://dealer.connect.net.pk' }}" required placeholder="https://dealer.connect.net.pk">
+                        </div>
+                        <div class="form-text small">Standard login URL provided by Connect Communications for your dealer franchise.</div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Dealer Username *</label>
+                            <input type="text" name="dealer_username" class="form-control font-monospace fw-bold" value="{{ config.dealer_username or 'sabro.dealer' }}" required placeholder="e.g. sabro.dealer">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Dealer Password</label>
+                            <div class="input-group">
+                                <input type="password" name="dealer_password" id="dealerPassInput" class="form-control font-monospace" value="{{ config.dealer_password or '' }}" placeholder="Enter password">
+                                <button type="button" class="btn btn-outline-secondary" onclick="toggleDealerPass()">
+                                    <i class="bi bi-eye" id="dealerPassIcon"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-4">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Auto-Sync Schedule</label>
+                            <select name="auto_sync_interval" class="form-select">
+                                <option value="Manual" {% if config.auto_sync_interval == 'Manual' %}selected{% endif %}>Manual (On-Demand)</option>
+                                <option value="Daily" {% if config.auto_sync_interval == 'Daily' %}selected{% endif %}>Every 24 Hours (Midnight)</option>
+                                <option value="6Hours" {% if config.auto_sync_interval == '6Hours' %}selected{% endif %}>Every 6 Hours</option>
+                            </select>
+                        </div>
+                        <div class="col-6 d-flex align-items-end">
+                            <button type="submit" class="btn btn-dark w-100 fw-bold">
+                                <i class="bi bi-check2-circle me-1"></i> Save Configuration
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="p-3 bg-light rounded-3 border d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2">
+                <div>
+                    <div class="fw-semibold text-dark small"><i class="bi bi-broadcast text-success me-1"></i> Connection Diagnostic</div>
+                    <div class="small text-muted">Test communication with your dealer portal endpoint.</div>
+                </div>
+                <form action="{{ url_for('dealer_sync_test_connection') }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-sm btn-outline-primary fw-semibold">
+                        <i class="bi bi-activity me-1"></i> Test Portal Connection
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: 1-Click Dealer Sheet Import (.CSV / .XLSX) -->
+    <div class="col-lg-6">
+        <div class="table-card p-4 h-100 d-flex flex-column justify-content-between">
+            <div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-file-earmark-spreadsheet-fill text-success me-2"></i> Import Connect Dealer Export Sheet
+                    </h5>
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success">Excel / CSV Supported</span>
+                </div>
+                <p class="text-muted small mb-3">
+                    If you already exported a subscriber sheet from your Connect Communications dealer panel, drop it below. The smart reconciliation engine will match usernames, update renewals, and add any missing accounts.
+                </p>
+
+                <!-- Drag & Drop Upload Zone -->
+                <form action="{{ url_for('dealer_sync_upload') }}" method="POST" enctype="multipart/form-data" class="mb-3">
+                    <div class="p-4 border border-2 border-dashed rounded-3 text-center mb-3 bg-light" style="cursor: pointer;" onclick="document.getElementById('dealerFileInput').click()">
+                        <i class="bi bi-cloud-arrow-up-fill fs-1 text-warning mb-2 d-block"></i>
+                        <h6 class="fw-bold text-dark mb-1">Click to browse or drop Connect Dealer Sheet</h6>
+                        <p class="text-muted small mb-2">Supports .CSV, .TXT, or Excel export files with UTF-8 encoding</p>
+                        <input type="file" name="dealer_file" id="dealerFileInput" class="d-none" accept=".csv, .txt, .xls, .xlsx" onchange="fileSelected(this)">
+                        <span id="selectedFileName" class="badge bg-dark text-white fw-semibold d-none">No file selected</span>
+                    </div>
+
+                    <button type="submit" class="btn btn-orange w-100 fw-bold py-2 shadow-sm" id="uploadBtn" disabled>
+                        <i class="bi bi-box-arrow-in-down me-1"></i> Ingest & Reconcile Sheet
+                    </button>
+                </form>
+            </div>
+
+            <!-- Intelligent Auto-Mapping Specifications -->
+            <div class="p-3 bg-light rounded-3 border">
+                <div class="small fw-bold text-dark mb-1"><i class="bi bi-check-all text-success me-1"></i> Auto-Recognized Dealer Columns:</div>
+                <div class="small text-muted">
+                    <code>Username / Login ID</code> &bull; 
+                    <code>Password / Secret</code> &bull; 
+                    <code>Expiry Date</code> &bull; 
+                    <code>Plan / Speed</code> &bull; 
+                    <code>Customer Name</code> &bull; 
+                    <code>Phone</code>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sync History & Audit Trail Table -->
+<div class="table-card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-clock-history text-warning fs-5"></i>
+            <div>
+                <h6 class="fw-bold mb-0 text-dark">Dealer Synchronization & Reconciliation Audit Trail</h6>
+                <div class="small text-muted">Complete log of all upstream pulls, updated subscriber expiry extensions, and new accounts.</div>
+            </div>
+        </div>
+        <span class="badge badge-orange">{{ logs|length }} Sync Records</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light small">
+                <tr>
+                    <th style="width: 170px;">Timestamp</th>
+                    <th>Source Engine</th>
+                    <th>Status</th>
+                    <th>Scanned</th>
+                    <th>Updated Expiries</th>
+                    <th>New Subscribers</th>
+                    <th>Reconciliation Summary</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td class="font-monospace small fw-bold text-dark">{{ log.sync_time }}</td>
+                    <td>
+                        <span class="badge bg-light text-dark border">
+                            <i class="bi bi-arrow-down-circle text-primary me-1"></i>{{ log.source }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if log.status == 'Success' %}
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success"><i class="bi bi-check-circle-fill me-1"></i>Success</span>
+                        {% else %}
+                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger"><i class="bi bi-exclamation-circle-fill me-1"></i>{{ log.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="fw-bold">{{ log.total_scanned }}</td>
+                    <td>
+                        <span class="badge bg-warning bg-opacity-25 text-dark fw-bold border border-warning">
+                            +{{ log.updated_count }} Updated
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge bg-success bg-opacity-25 text-success fw-bold border border-success">
+                            +{{ log.created_count }} Added
+                        </span>
+                    </td>
+                    <td>
+                        <div class="small text-muted text-truncate" style="max-width: 380px;" title="{{ log.details }}">
+                            {{ log.details }}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        <i class="bi bi-cloud-arrow-down fs-2 d-block mb-1 text-secondary"></i>
+                        No dealer synchronizations logged yet. Click "Pull & Sync Data Now" to run your first sync!
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleDealerPass() {
+        const inp = document.getElementById('dealerPassInput');
+        const ico = document.getElementById('dealerPassIcon');
+        if (inp.type === 'password') {
+            inp.type = 'text';
+            ico.className = 'bi bi-eye-slash';
+        } else {
+            inp.type = 'password';
+            ico.className = 'bi bi-eye';
+        }
+    }
+
+    function fileSelected(input) {
+        const btn = document.getElementById('uploadBtn');
+        const badge = document.getElementById('selectedFileName');
+        if (input.files && input.files[0]) {
+            badge.textContent = input.files[0].name;
+            badge.classList.remove('d-none');
+            btn.removeAttribute('disabled');
+        } else {
+            badge.classList.add('d-none');
+            btn.setAttribute('disabled', 'disabled');
+        }
+    }
+
+    // Show loading spinner on sync submit
+    const syncForm = document.getElementById('dealerSyncForm');
+    if (syncForm) {
+        syncForm.addEventListener('submit', () => {
+            const btn = document.getElementById('syncRunBtn');
+            const ico = document.getElementById('syncRunIcon');
+            if (btn && ico) {
+                btn.setAttribute('disabled', 'disabled');
+                ico.className = 'spinner-border spinner-border-sm me-1';
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Contacting Dealer Panel...';
+            }
+        });
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block page_title %}System & Company Settings{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Left Column: Settings Configuration Form -->
+    <div class="col-xl-7">
+        <form action="{{ url_for('settings_page') }}" method="POST" id="settingsForm">
+            <!-- 1. ISP Network & Brand Identity -->
+            <div class="table-card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-building me-2" style="color: #ea580c;"></i> ISP Brand & Network Identity
+                    </h5>
+                    <span class="badge badge-orange">General Config</span>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Network / ISP Full Name *</label>
+                    <input type="text" name="isp_name" id="inputIspName" class="form-control fw-bold fs-6" value="{{ settings.get('isp_name', 'Sabro Networks') }}" required placeholder="e.g. Sabro Networks">
+                    <div class="form-text small text-muted">Displays in top headers, sidebars, customer invoices, and WhatsApp messages.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Service Brand Tagline</label>
+                    <input type="text" name="tagline" id="inputTagline" class="form-control" value="{{ settings.get('tagline', 'FTTH High-Speed Fiber Internet') }}" placeholder="e.g. FTTH High-Speed Fiber Internet">
+                    <div class="form-text small text-muted">Appears beneath the logo on login, bill slips, and navigation.</div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold"><i class="bi bi-telephone-fill text-primary me-1"></i> Helpline Phone</label>
+                        <input type="text" name="phone" id="inputPhone" class="form-control" value="{{ settings.get('phone', '0300-1234567') }}" placeholder="0300-1234567">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold"><i class="bi bi-cash-coin text-success me-1"></i> Currency Symbol / Code</label>
+                        <input type="text" name="currency" id="inputCurrency" class="form-control fw-bold" value="{{ settings.get('currency', 'PKR') }}" placeholder="PKR">
+                    </div>
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold"><i class="bi bi-envelope-fill text-secondary me-1"></i> Official Email</label>
+                        <input type="email" name="email" id="inputEmail" class="form-control" value="{{ settings.get('email', 'info@sabronetworks.com') }}" placeholder="info@sabronetworks.com">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold"><i class="bi bi-geo-alt-fill text-danger me-1"></i> NOC Hub / Main Office Address</label>
+                        <input type="text" name="address" id="inputAddress" class="form-control" value="{{ settings.get('address', 'Main Fiber Exchange Hub, Pakistan') }}" placeholder="NOC Office Address">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Business WhatsApp & Automated Link Config -->
+            <div class="table-card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-whatsapp text-success me-2"></i> Business WhatsApp & Automated Messages
+                    </h5>
+                    <span class="badge bg-success text-white">Direct Dispatch</span>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Official Business WhatsApp Number (with Country Code) *</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light text-success fw-bold"><i class="bi bi-whatsapp"></i></span>
+                        <input type="text" name="business_whatsapp" id="inputWhatsapp" class="form-control fw-bold text-success font-monospace" value="{{ settings.get('business_whatsapp', '923001234567') }}" required placeholder="923001234567">
+                    </div>
+                    <div class="form-text small text-muted">Format: 923001234567 (No plus, no spaces, no dashes). Used for customer WhatsApp bills & technician dispatch.</div>
+                </div>
+            </div>
+
+            <!-- 3. Online Payment Accounts (Printed on Bills & WhatsApp) -->
+            <div class="table-card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-credit-card-2-front-fill text-success me-2"></i> Online Payment Accounts (Bills & WhatsApp)
+                    </h5>
+                    <span class="badge bg-light text-dark border">Bill Footer</span>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold"><i class="bi bi-phone text-danger me-1"></i> JazzCash Account # & Title</label>
+                        <input type="text" name="jazzcash_no" id="inputJazzcash" class="form-control" value="{{ settings.get('jazzcash_no', '0300-1234567 (Sabro Networks)') }}" placeholder="0300-1234567 (Account Title)">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold"><i class="bi bi-phone text-success me-1"></i> EasyPaisa Account # & Title</label>
+                        <input type="text" name="easypaisa_no" id="inputEasypaisa" class="form-control" value="{{ settings.get('easypaisa_no', '0300-1234567 (Sabro Networks)') }}" placeholder="0300-1234567 (Account Title)">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold"><i class="bi bi-bank text-primary me-1"></i> Bank Account / IBAN Details</label>
+                        <input type="text" name="bank_info" id="inputBank" class="form-control" value="{{ settings.get('bank_info', 'Meezan Bank - A/C: 0101-1234567890 (Sabro Networks)') }}" placeholder="Bank Name - Account Number (Title)">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Engineering Agency & Technology Partner (Vshatkay Solutions) -->
+            <div class="table-card p-4 mb-4" style="border: 1.5px solid rgba(234, 88, 12, 0.4);">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-code-slash text-danger me-2"></i> Engineering Agency & Technology Partner
+                    </h5>
+                    <span class="badge bg-dark text-white">Agency Credit</span>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Engineering Company / Agency Name</label>
+                        <input type="text" name="agency_name" id="inputAgencyName" class="form-control fw-bold" value="{{ settings.get('agency_name', 'Vshatkay Solutions') }}" placeholder="Vshatkay Solutions">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Agency Specialization / Tagline</label>
+                        <input type="text" name="agency_tagline" id="inputAgencyTagline" class="form-control" value="{{ settings.get('agency_tagline', 'Software Engineering & Telecom Solutions Agency') }}" placeholder="Software Engineering & Telecom Agency">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Agency Web Portal / URL</label>
+                        <input type="text" name="agency_url" id="inputAgencyUrl" class="form-control font-monospace" value="{{ settings.get('agency_url', 'https://vshatkaysolutions.com') }}" placeholder="https://vshatkaysolutions.com">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save Settings Button -->
+            <div class="d-flex justify-content-end mb-4">
+                <button type="submit" class="btn btn-orange px-5 py-2 fw-bold shadow">
+                    <i class="bi bi-check-lg me-1"></i> Save System & Payment Settings
+                </button>
+            </div>
+        </form>
+
+        <!-- Database Safety & Offline Backup Card -->
+        <div class="table-card p-4 mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <h5 class="fw-bold mb-1 text-dark">
+                        <i class="bi bi-database-fill-down me-2" style="color: #ea580c;"></i> Database Safety & Offline Backup
+                    </h5>
+                    <p class="text-muted small mb-0">
+                        Download a complete timestamped copy of your SQLite database or restore a verified backup file.
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('backup_db') }}" class="btn btn-success fw-bold px-3 py-2 shadow-sm">
+                        <i class="bi bi-download me-1"></i> Download Backup (.db)
+                    </a>
+                    <button type="button" class="btn btn-outline-danger fw-bold px-3 py-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#restoreDbModal">
+                        <i class="bi bi-cloud-arrow-up-fill me-1"></i> Upload & Restore Backup
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Live Direct Result Preview (Instant Real-time Feedback) -->
+    <div class="col-xl-5">
+        <div style="position: sticky; top: 85px;">
+            <div class="table-card p-4 mb-4" style="background: rgba(255, 255, 255, 0.98); border: 2px solid #ea580c; box-shadow: 0 15px 35px -5px rgba(234, 88, 12, 0.2);">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0">
+                            <i class="bi bi-eye-fill text-danger me-2"></i> Live Direct Result Preview
+                        </h6>
+                        <div class="small text-muted" style="font-size: 0.72rem;">Updates instantly as you type</div>
+                    </div>
+                    <span class="badge bg-success text-white pulse-indicator">Live Active</span>
+                </div>
+
+                <!-- 1. Live Brand Header Replica -->
+                <div class="p-3 rounded-3 mb-3 text-center" style="background: linear-gradient(135deg, #0f172a, #1e293b); border: 1px solid rgba(234, 88, 12, 0.35);">
+                    <img src="{{ url_for('static', filename='img/sabro_logo.jpg') }}" alt="Logo" class="rounded-circle shadow mb-2" style="width: 52px; height: 52px; object-fit: cover; border: 2.5px solid #ea580c;">
+                    <h5 class="fw-bold text-white mb-0" id="previewIspName">{{ settings.get('isp_name', 'Sabro Networks') }}</h5>
+                    <div class="small fw-semibold mt-1" style="color: #fb923c;" id="previewTagline">{{ settings.get('tagline', 'FTTH High-Speed Fiber Internet') }}</div>
+                    <div class="mt-2 text-white-50 small d-flex justify-content-center gap-2" style="font-size: 0.72rem;">
+                        <span><i class="bi bi-telephone text-warning me-1"></i><span id="previewPhone">{{ settings.get('phone', '0300-1234567') }}</span></span>
+                        <span>&bull;</span>
+                        <span><i class="bi bi-geo-alt text-danger me-1"></i><span id="previewAddress">{{ settings.get('address', 'Main Fiber Hub') }}</span></span>
+                    </div>
+                </div>
+
+                <!-- 2. Sample Printable Bill Preview Box -->
+                <div class="p-3 rounded-3 mb-3 border bg-light">
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
+                        <span class="small fw-bold text-uppercase text-dark" style="font-size: 0.72rem;"><i class="bi bi-receipt me-1"></i> Sample Bill Slip Preview</span>
+                        <span class="badge bg-danger">Unpaid</span>
+                    </div>
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Internet Package:</span>
+                        <strong class="text-dark">30 MB Gaming Ultra Plan</strong>
+                    </div>
+                    <div class="d-flex justify-content-between small mb-2">
+                        <span class="text-muted">Total Amount:</span>
+                        <strong class="text-danger fs-6"><span id="previewCurrency">{{ settings.get('currency', 'PKR') }}</span> 2,200</strong>
+                    </div>
+
+                    <!-- Online Payment Preview -->
+                    <div class="p-2 bg-white rounded border small mb-2" style="font-size: 0.75rem;">
+                        <div class="fw-bold text-dark mb-1"><i class="bi bi-wallet2 text-success me-1"></i> Payment Accounts (On Bills):</div>
+                        <div class="text-muted"><strong>JazzCash:</strong> <span id="previewJazzcash">{{ settings.get('jazzcash_no', '0300-1234567 (Sabro Networks)') }}</span></div>
+                        <div class="text-muted"><strong>EasyPaisa:</strong> <span id="previewEasypaisa">{{ settings.get('easypaisa_no', '0300-1234567 (Sabro Networks)') }}</span></div>
+                        <div class="text-muted text-truncate"><strong>Bank:</strong> <span id="previewBank">{{ settings.get('bank_info', 'Meezan Bank') }}</span></div>
+                    </div>
+
+                    <!-- Direct WhatsApp Tester -->
+                    <div class="text-center pt-1">
+                        <a href="https://wa.me/{{ clean_whatsapp_phone(settings.get('business_whatsapp', '923001234567')) }}" target="_blank" id="previewWhatsappBtn" class="btn btn-sm btn-success fw-bold w-100 shadow-sm">
+                            <i class="bi bi-whatsapp me-1"></i> Test WhatsApp Link (<span id="previewWhatsappNumber">{{ settings.get('business_whatsapp', '923001234567') }}</span>)
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 3. Vshatkay Solutions Agency Attribution Preview -->
+                <div class="p-3 rounded-3" style="background: linear-gradient(135deg, #18181b, #27272a); border: 1.5px solid #ea580c;">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="rounded-2 d-flex align-items-center justify-content-center text-white flex-shrink-0" style="width: 42px; height: 42px; background: linear-gradient(135deg, #ea580c, #f97316); font-weight: 900; font-size: 1.1rem; box-shadow: 0 0 15px rgba(234, 88, 12, 0.5);">
+                            VS
+                        </div>
+                        <div>
+                            <div class="text-white fw-bold fs-6" id="previewAgencyName">{{ settings.get('agency_name', 'Vshatkay Solutions') }}</div>
+                            <div class="small" style="color: #fed7aa; font-size: 0.75rem;" id="previewAgencyTagline">{{ settings.get('agency_tagline', 'Software Engineering & Telecom Solutions Agency') }}</div>
+                            <div class="small mt-1 text-white-50" style="font-size: 0.7rem;">
+                                <i class="bi bi-shield-check text-success me-1"></i> Official System & Platform Engineering Company
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload & Restore Database Modal -->
+<div class="modal fade" id="restoreDbModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('restore_db') }}" method="POST" enctype="multipart/form-data" onsubmit="return confirm('WARNING: Uploading and restoring a database backup will synchronize the active database. Proceed?');">
+                <div class="modal-header bg-white border-bottom">
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi bi-database-fill-exclamation text-danger me-2"></i> Upload Database Backup (.db)
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="alert alert-warning small d-flex align-items-center gap-2 mb-3">
+                        <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0 text-warning"></i>
+                        <div>
+                            <strong>Important Safety Notice:</strong> An automatic point-in-time snapshot of the current database is saved before restoration. Only upload authentic SQLite (.db) backups.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Select SQLite Database File (.db) *</label>
+                        <input type="file" name="backup_file" class="form-control" accept=".db,.sqlite,.sqlite3" required>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger fw-bold px-4">
+                        <i class="bi bi-arrow-repeat me-1"></i> Verify & Restore Database
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Live Real-Time Interactive Settings Preview
+    const bindInputToPreview = (inputId, previewId, fallbackText) => {
+        const inputEl = document.getElementById(inputId);
+        const previewEl = document.getElementById(previewId);
+        if (inputEl && previewEl) {
+            inputEl.addEventListener('input', function() {
+                previewEl.textContent = this.value.trim() || fallbackText;
+            });
+        }
+    };
+
+    bindInputToPreview('inputIspName', 'previewIspName', 'Sabro Networks');
+    bindInputToPreview('inputTagline', 'previewTagline', 'FTTH High-Speed Fiber Internet');
+    bindInputToPreview('inputPhone', 'previewPhone', '0300-1234567');
+    bindInputToPreview('inputCurrency', 'previewCurrency', 'PKR');
+    bindInputToPreview('inputAddress', 'previewAddress', 'Main Fiber Hub');
+    bindInputToPreview('inputJazzcash', 'previewJazzcash', '0300-1234567 (Sabro Networks)');
+    bindInputToPreview('inputEasypaisa', 'previewEasypaisa', '0300-1234567 (Sabro Networks)');
+    bindInputToPreview('inputBank', 'previewBank', 'Meezan Bank');
+    bindInputToPreview('inputAgencyName', 'previewAgencyName', 'Vshatkay Solutions');
+    bindInputToPreview('inputAgencyTagline', 'previewAgencyTagline', 'Software Engineering & Telecom Solutions Agency');
+
+    // WhatsApp Live Tester Button sync
+    const waInput = document.getElementById('inputWhatsapp');
+    const waNumberPreview = document.getElementById('previewWhatsappNumber');
+    const waBtn = document.getElementById('previewWhatsappBtn');
+    if (waInput && waNumberPreview && waBtn) {
+        waInput.addEventListener('input', function() {
+            const num = this.value.trim() || '923001234567';
+            waNumberPreview.textContent = num;
+            const clean = num.replace(/[^0-9]/g, '');
+            waBtn.href = 'https://wa.me/' + clean;
+        });
+    }
+</script>
+{% endblock %}

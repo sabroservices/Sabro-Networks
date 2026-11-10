@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block page_title %}Recovery Boys & Field Collections{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <p class="text-muted mb-0">Manage your field recovery boys, assign collection sectors, and monitor total cash collected by each recovery boy.</p>
+    </div>
+    <button class="btn btn-orange shadow-sm" data-bs-toggle="modal" data-bs-target="#addRecoveryModal">
+        <i class="bi bi-person-plus-fill me-1"></i> Add Recovery Boy
+    </button>
+</div>
+
+<!-- Recovery Stats Banner -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="stat-card" style="border-left: 4px solid #ea580c;">
+            <div class="small fw-bold text-uppercase" style="color: #c2410c;"><i class="bi bi-cash-stack me-1"></i> Total Handed Over by Recovery Boys</div>
+            <div class="fs-3 fw-bold mt-1 text-success">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(total_recovered) }}</div>
+            <div class="small text-muted">Field recovery verified and accounted</div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="stat-card">
+            <div class="small fw-bold text-muted text-uppercase"><i class="bi bi-geo-alt-fill text-warning me-1"></i> Active Field Boys</div>
+            <div class="fs-3 fw-bold mt-1 text-dark">{{ staff_list|length }} Recovery Staff</div>
+            <div class="small text-muted">Covering all subscriber sectors</div>
+        </div>
+    </div>
+</div>
+
+<!-- Recovery Staff Table -->
+<div class="table-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-bicycle me-2 text-warning"></i> Recovery Boys Directory</span>
+        <span class="badge badge-orange">Field Recovery Team</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light small">
+                <tr>
+                    <th>Recovery Boy Name</th>
+                    <th>Phone / WhatsApp</th>
+                    <th>Assigned Area / Sector</th>
+                    <th>Status</th>
+                    <th>Bills Recovered</th>
+                    <th>Total Cash Collected</th>
+                    <th class="text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in staff_list %}
+                <tr>
+                    <td>
+                        <div class="fw-bold fs-6 text-dark">{{ s.name }}</div>
+                        <div class="small text-muted">Staff #STF-{{ "%03d"|format(s.id) }}</div>
+                    </td>
+                    <td>
+                        <div><i class="bi bi-telephone text-muted me-1"></i> {{ s.phone }}</div>
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark border"><i class="bi bi-geo-alt text-danger me-1"></i> {{ s.assigned_area or 'General' }}</span>
+                    </td>
+                    <td>
+                        {% if s.status == 'Active' %}
+                            <span class="badge badge-active"><i class="bi bi-check-circle-fill me-1"></i> Active</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Off Duty</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark border">{{ s.collected_invoices_count }} Bills</span>
+                    </td>
+                    <td>
+                        <div class="fs-6 fw-bold text-success">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(s.total_collected) }}</div>
+                    </td>
+                    <td class="text-end">
+                        <form action="{{ url_for('delete_recovery_staff', id=s.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Remove recovery boy {{ s.name }}?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">No recovery boys added yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Recovery Boy Modal -->
+<div class="modal fade" id="addRecoveryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('add_recovery_staff') }}" method="POST">
+                <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                    <h5 class="modal-title fw-bold" class="text-dark">
+                        <i class="bi bi-person-plus-fill me-2" style="color: #ea580c;"></i> Add Recovery Boy
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Full Name *</label>
+                        <input type="text" name="name" class="form-control" required placeholder="e.g. Shahzaib Khan">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Phone Number *</label>
+                        <input type="text" name="phone" class="form-control" required placeholder="0300-1122334">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Assigned Recovery Sector / Area *</label>
+                        <input type="text" name="assigned_area" class="form-control" required placeholder="e.g. Sector A & Main Bazaar">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Status</label>
+                        <select name="status" class="form-select">
+                            <option value="Active" selected>Active</option>
+                            <option value="Off Duty">Off Duty</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background-color: #f8fafc;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-orange px-4"><i class="bi bi-check-lg me-1"></i> Save Recovery Boy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

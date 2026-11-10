@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+
+{% block page_title %}Complaints & Support Tickets{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3 mb-4">
+    <!-- Instant Live Search & New Ticket -->
+    <div class="input-group flex-grow-1" style="max-width: 540px;">
+        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-warning"></i></span>
+        <input type="text" id="ticketSearch" class="form-control border-start-0" placeholder="Type to search ticket #, customer, tech, issue...">
+    </div>
+
+    <button class="btn btn-orange shadow-sm flex-grow-1 flex-md-grow-0" data-bs-toggle="modal" data-bs-target="#newTicketModal">
+        <i class="bi bi-plus-circle me-1"></i> Register New Complaint
+    </button>
+</div>
+
+<!-- Ticket Stats Overview -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="text-muted small fw-semibold text-uppercase">Total Complaints</div>
+            <div class="fs-4 fw-bold mt-1 text-dark">{{ tickets|length }}</div>
+            <div class="small text-muted mt-1"><i class="bi bi-journal-text text-primary"></i> All-time logged</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card border-danger">
+            <div class="text-muted small fw-semibold text-uppercase">Open / Pending</div>
+            <div class="fs-4 fw-bold mt-1 text-danger">{{ open_count }}</div>
+            <div class="small text-danger mt-1"><i class="bi bi-exclamation-diamond-fill"></i> Needs technician</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="text-muted small fw-semibold text-uppercase">In Progress</div>
+            <div class="fs-4 fw-bold mt-1 text-warning">{{ in_progress_count }}</div>
+            <div class="small text-warning mt-1"><i class="bi bi-tools"></i> Field work ongoing</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card border-success">
+            <div class="text-muted small fw-semibold text-uppercase">Resolved</div>
+            <div class="fs-4 fw-bold mt-1 text-success">{{ resolved_count }}</div>
+            <div class="small text-success mt-1"><i class="bi bi-check-circle-fill"></i> Solved & Closed</div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Chips Bar -->
+<div class="filter-chips-bar mb-3">
+    <button type="button" class="filter-chip active" onclick="filterTickets('all', this)">
+        <i class="bi bi-grid-fill me-1"></i> All Complaints ({{ tickets|length }})
+    </button>
+    <button type="button" class="filter-chip" onclick="filterTickets('Open', this)">
+        <i class="bi bi-exclamation-triangle-fill text-danger me-1"></i> Open Outages ({{ open_count }})
+    </button>
+    <button type="button" class="filter-chip" onclick="filterTickets('In Progress', this)">
+        <i class="bi bi-tools text-warning me-1"></i> In Progress ({{ in_progress_count }})
+    </button>
+    <button type="button" class="filter-chip" onclick="filterTickets('Critical', this)">
+        <i class="bi bi-fire text-danger me-1"></i> Critical Priority
+    </button>
+    <button type="button" class="filter-chip" onclick="filterTickets('Resolved', this)">
+        <i class="bi bi-check2-circle text-success me-1"></i> Resolved ({{ resolved_count }})
+    </button>
+</div>
+
+<!-- Support Tickets Table -->
+<div class="table-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-headset text-warning me-2"></i> FTTH Complaints Directory (<span id="ticketCountBadge" class="fw-bold">{{ tickets|length }}</span>)</span>
+        <span class="badge badge-orange">Sabro FTTH Support Desk</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="ticketsTable">
+            <thead class="table-light small">
+                <tr>
+                    <th>Ticket #</th>
+                    <th>Customer & Address</th>
+                    <th>Issue & Details</th>
+                    <th>Priority</th>
+                    <th>Assigned Complain Boy</th>
+                    <th>Status</th>
+                    <th>Date Logged</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tickets %}
+                <tr class="ticket-row" data-status="{{ t.status }}" data-priority="{{ t.priority }}">
+                    <td>
+                        <span class="font-monospace fw-bold text-dark clickable-copy" onclick="copyToClipboard('{{ t.ticket_number }}', 'Ticket #')" title="Click to copy ticket #">
+                            <i class="bi bi-copy text-muted small me-1"></i>{{ t.ticket_number }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ t.customer_name }}</div>
+                        <div class="small font-monospace text-primary">
+                            <span class="clickable-copy" onclick="copyToClipboard('{{ t.pppoe_username }}', 'PPPoE Username')" title="Click to copy">@{{ t.pppoe_username }}</span> &bull; 
+                            <span class="clickable-copy" onclick="copyToClipboard('{{ t.customer_phone }}', 'Customer Phone')" title="Click to copy">{{ t.customer_phone }}</span>
+                            {% if t.customer_phone %}
+                            <a href="https://wa.me/{{ clean_whatsapp_phone(t.customer_phone) }}" target="_blank" class="text-success ms-1" title="Direct Customer WhatsApp">
+                                <i class="bi bi-whatsapp"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex align-items-center gap-1 flex-wrap mt-1">
+                            <span class="badge bg-light text-dark border small"><i class="bi bi-diagram-3 me-1 text-danger"></i>{{ t.db_box or 'FDB Box' }}</span>
+                            {% set c_core = (t.fiber_core|default('Core 1'))|lower %}
+                            {% if 'blue' in c_core or '1' in c_core %}
+                                <span class="core-pill core-blue" title="Drop Fiber Core 1"><i class="bi bi-circle-fill me-1"></i>{{ t.fiber_core or 'Core 1 Blue' }}</span>
+                            {% elif 'orange' in c_core or '2' in c_core %}
+                                <span class="core-pill core-orange" title="Drop Fiber Core 2"><i class="bi bi-circle-fill me-1"></i>{{ t.fiber_core or 'Core 2 Orange' }}</span>
+                            {% elif 'green' in c_core or '3' in c_core %}
+                                <span class="core-pill core-green" title="Drop Fiber Core 3"><i class="bi bi-circle-fill me-1"></i>{{ t.fiber_core or 'Core 3 Green' }}</span>
+                            {% elif 'brown' in c_core or '4' in c_core %}
+                                <span class="core-pill core-brown" title="Drop Fiber Core 4"><i class="bi bi-circle-fill me-1"></i>{{ t.fiber_core or 'Core 4 Brown' }}</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border">{{ t.fiber_core or 'Core 1' }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="small text-muted text-truncate" style="max-width: 220px;"><i class="bi bi-geo-alt me-1"></i>{{ t.customer_area }}, {{ t.customer_address }}</div>
+                    </td>
+                    <td>
+                        <div class="fw-semibold text-dark">{{ t.subject }}</div>
+                        <div class="small text-muted text-truncate" style="max-width: 250px;">{{ t.details or 'No extra notes' }}</div>
+                        {% if t.resolution_notes %}
+                            <div class="small text-success mt-1"><i class="bi bi-check2-all me-1"></i><strong>Solved:</strong> {{ t.resolution_notes }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if t.priority == 'Critical' %}
+                            <span class="badge bg-danger shadow-sm"><i class="bi bi-fire me-1"></i> Critical Outage</span>
+                        {% elif t.priority == 'High' %}
+                            <span class="badge bg-danger bg-opacity-75 text-white">High</span>
+                        {% elif t.priority == 'Medium' %}
+                            <span class="badge bg-warning text-dark">Medium</span>
+                        {% else %}
+                            <span class="badge bg-light text-secondary border">Low</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if t.tech_name %}
+                            <div class="fw-bold text-dark">{{ t.tech_name }}</div>
+                            <div class="small text-muted">
+                                <a href="tel:{{ t.tech_phone }}" class="text-decoration-none text-muted clickable-copy" onclick="copyToClipboard('{{ t.tech_phone }}', 'Tech Phone')"><i class="bi bi-telephone-fill me-1"></i>{{ t.tech_phone }}</a>
+                            </div>
+                        {% else %}
+                            <span class="badge bg-light text-danger border border-danger">Unassigned</span>
+                        {% endif %}
+                        {% if current_user and current_user.role == 'Admin' %}
+                        <form action="{{ url_for('assign_ticket', id=t.id) }}" method="POST" class="mt-1">
+                            <select name="assigned_user_id" class="form-select form-select-sm py-0 px-1 border-secondary" style="font-size: 0.72rem; max-width: 140px;" onchange="this.form.submit()" title="Assign or reassign Complaint Boy">
+                                <option value="">-- Assign Tech --</option>
+                                {% for tech in complain_boys %}
+                                <option value="{{ tech.id }}" {% if t.assigned_user_id == tech.id %}selected{% endif %}>
+                                    {{ tech.full_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if t.status == 'Open' %}
+                            <span class="badge bg-danger">OPEN</span>
+                        {% elif t.status == 'In Progress' %}
+                            <span class="badge bg-warning text-dark">IN PROGRESS</span>
+                        {% else %}
+                            <span class="badge bg-success">RESOLVED</span>
+                        {% endif %}
+                    </td>
+                    <td class="small text-muted">
+                        <div>{{ t.created_at }}</div>
+                        {% if t.resolved_at %}
+                            <div class="text-success small fw-bold"><i class="bi bi-check-lg"></i> {{ t.resolved_at }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <div class="d-inline-flex gap-1 flex-nowrap">
+                            <!-- If Resolved: Send Resolution Notice to Customer WhatsApp -->
+                            {% if t.status == 'Resolved' %}
+                            <a href="{{ url_for('whatsapp_ticket_resolved', id=t.id) }}" target="_blank" class="btn btn-sm btn-success fw-bold" title="Send Official Resolution Notice to Customer WhatsApp">
+                                <i class="bi bi-patch-check-fill me-1"></i> <span class="d-none d-md-inline">Notify Customer</span>
+                            </a>
+                            {% else %}
+                                <!-- WhatsApp to Tech Dispatch Button -->
+                                {% if t.tech_phone %}
+                                <a href="{{ url_for('whatsapp_ticket', id=t.id) }}" target="_blank" class="btn btn-sm btn-outline-success fw-semibold" title="Dispatch Complaint to Complain Boy WhatsApp">
+                                    <i class="bi bi-whatsapp me-1"></i> <span class="d-none d-md-inline">Dispatch Tech</span>
+                                </a>
+                                {% else %}
+                                <button class="btn btn-sm btn-outline-secondary disabled" title="Assign a technician first to enable WhatsApp">
+                                    <i class="bi bi-whatsapp"></i>
+                                </button>
+                                {% endif %}
+                            {% endif %}
+
+                            <!-- Edit Ticket Button -->
+                            <button type="button" class="btn btn-sm btn-outline-warning text-dark" data-bs-toggle="modal" data-bs-target="#editTicketModal{{ t.id }}" title="Edit Ticket Details">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+
+                            {% if current_user and current_user.role == 'Admin' %}
+                            <!-- Delete Ticket -->
+                            <form action="{{ url_for('delete_ticket', id=t.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete complaint ticket {{ t.ticket_number }}?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+
+
+                    </td>
+                </tr>
+                <tr id="ticketNoMatchRow" style="display:none;">
+                    <td colspan="8" class="text-center py-4 text-muted">
+                        <i class="bi bi-search me-1"></i> No complaints match your selected filter or search query.
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-muted">
+                        No support complaint tickets found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ================= EDIT TICKET MODALS (OUTSIDE TABLE) ================= -->
+{% for t in tickets %}
+                        <!-- Edit Ticket Modal -->
+                        <div class="modal fade" id="editTicketModal{{ t.id }}" tabindex="-1" style="text-align: left;">
+                            <div class="modal-dialog modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <form action="{{ url_for('edit_ticket', id=t.id) }}" method="POST">
+                                        <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                                            <h5 class="modal-title fw-bold" class="text-dark">
+                                                <i class="bi bi-pencil-square me-2" style="color: #ea580c;"></i> Edit Ticket {{ t.ticket_number }}
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body p-4">
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Customer</label>
+                                                <input type="text" class="form-control bg-light" value="{{ t.customer_name }} (@{{ t.pppoe_username }})" readonly>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Issue Subject *</label>
+                                                <input type="text" name="subject" class="form-control" value="{{ t.subject }}" required>
+                                            </div>
+                                            <div class="row g-2 mb-3">
+                                                <div class="col-6">
+                                                    <label class="form-label fw-bold">Priority *</label>
+                                                    <select name="priority" class="form-select">
+                                                        <option value="Low" {% if t.priority == 'Low' %}selected{% endif %}>Low</option>
+                                                        <option value="Medium" {% if t.priority == 'Medium' %}selected{% endif %}>Medium</option>
+                                                        <option value="High" {% if t.priority == 'High' %}selected{% endif %}>High</option>
+                                                        <option value="Critical" {% if t.priority == 'Critical' %}selected{% endif %}>Critical Outage</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label fw-bold">Status *</label>
+                                                    <select name="status" class="form-select">
+                                                        <option value="Open" {% if t.status == 'Open' %}selected{% endif %}>Open</option>
+                                                        <option value="In Progress" {% if t.status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                                        <option value="Resolved" {% if t.status == 'Resolved' %}selected{% endif %}>Resolved</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            {% if current_user and current_user.role == 'Complaint Boy' %}
+                                                <input type="hidden" name="assigned_user_id" value="{{ t.assigned_user_id or current_user.id }}">
+                                            {% else %}
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-bold">Assign Complain Boy / Tech</label>
+                                                    <select name="assigned_user_id" class="form-select">
+                                                        <option value="">-- Unassigned --</option>
+                                                        {% for cb in complain_boys %}
+                                                            <option value="{{ cb.id }}" {% if t.assigned_user_id == cb.id %}selected{% endif %}>
+                                                                {{ cb.full_name }} ({{ cb.role }}) - {{ cb.phone }}
+                                                            </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            {% endif %}
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Complaint Details</label>
+                                                <textarea name="details" class="form-control" rows="2">{{ t.details or '' }}</textarea>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Resolution Notes (If Solved)</label>
+                                                <textarea name="resolution_notes" class="form-control" rows="2" placeholder="e.g. Spliced yellow drop fiber, optic power restored to -18dBm">{{ t.resolution_notes or '' }}</textarea>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer" style="background-color: #f8fafc;">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-orange px-4"><i class="bi bi-check-lg me-1"></i> Update Ticket</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+
+{% endfor %}
+
+<!-- New Complaint Ticket Modal -->
+<div class="modal fade" id="newTicketModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <form action="{{ url_for('add_ticket') }}" method="POST">
+                <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                    <h5 class="modal-title fw-bold" class="text-dark">
+                        <i class="bi bi-headset me-2" style="color: #ea580c;"></i> Register Support Complaint
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Select Customer *</label>
+                        <select name="customer_id" class="form-select" required>
+                            <option value="">-- Choose Customer --</option>
+                            {% for c in customers %}
+                                <option value="{{ c.id }}">{{ c.full_name }} (@{{ c.pppoe_username }}) &bull; {{ c.area }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Issue / Problem Summary *</label>
+                        <input type="text" name="subject" class="form-control" required placeholder="e.g. Red LOS Light on ONU / Fiber wire cut / No Internet">
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Priority *</label>
+                            <select name="priority" class="form-select">
+                                <option value="Low">Low</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="High">High</option>
+                                <option value="Critical">Critical Outage</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Assign Complain Boy</label>
+                            <select name="assigned_user_id" class="form-select">
+                                <option value="">-- Unassigned --</option>
+                                {% for cb in complain_boys %}
+                                    <option value="{{ cb.id }}">{{ cb.full_name }} ({{ cb.role }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Details & Location Notes</label>
+                        <textarea name="details" class="form-control" rows="3" placeholder="Provide extra details for technician (pole #, landmark, customer availability)..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background-color: #f8fafc;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-orange px-4"><i class="bi bi-check-lg me-1"></i> Create Complaint Ticket</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentFilter = 'all';
+
+    function filterTickets(category, btn) {
+        currentFilter = category;
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        applyTicketFilters();
+    }
+
+    function applyTicketFilters() {
+        const query = (document.getElementById('ticketSearch').value || '').toLowerCase().trim();
+        const rows = document.querySelectorAll('#ticketsTable tbody tr.ticket-row');
+        let visibleCount = 0;
+
+        rows.forEach(row => {
+            const status = row.getAttribute('data-status') || '';
+            const priority = row.getAttribute('data-priority') || '';
+            const rowText = row.innerText.toLowerCase();
+
+            let matchesFilter = true;
+            if (currentFilter === 'Open') matchesFilter = (status === 'Open');
+            else if (currentFilter === 'In Progress') matchesFilter = (status === 'In Progress');
+            else if (currentFilter === 'Resolved') matchesFilter = (status === 'Resolved');
+            else if (currentFilter === 'Critical') matchesFilter = (priority === 'Critical');
+
+            const matchesSearch = !query || rowText.includes(query);
+
+            if (matchesFilter && matchesSearch) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        const badge = document.getElementById('ticketCountBadge');
+        if (badge) badge.innerText = visibleCount;
+
+        const emptyRow = document.getElementById('ticketNoMatchRow');
+        if (emptyRow) {
+            emptyRow.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+        }
+    }
+
+    const searchInput = document.getElementById('ticketSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', applyTicketFilters);
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,550 @@
+{% extends "base.html" %}
+
+{% block page_title %}Customer & PPPoE Subscribers Directory{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3 mb-4">
+    <!-- Live Instant Search & Status Filters -->
+    <div class="d-flex flex-column flex-sm-row gap-2 flex-grow-1" style="max-width: 720px;">
+        <div class="input-group">
+            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-warning"></i></span>
+            <input type="text" id="customerSearch" class="form-control border-start-0" placeholder="Search name, PPPoE, phone, pole, CNIC..." value="{{ search }}">
+        </div>
+        <form method="GET" action="{{ url_for('customers_list') }}" class="d-flex gap-2">
+            <select name="status" class="form-select" style="min-width: 120px;" onchange="this.form.submit()">
+                <option value="">Status: All</option>
+                <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
+                <option value="Expired" {% if status_filter == 'Expired' %}selected{% endif %}>Expired</option>
+                <option value="Suspended" {% if status_filter == 'Suspended' %}selected{% endif %}>Suspended</option>
+            </select>
+            <select name="payment" class="form-select" style="min-width: 120px;" onchange="this.form.submit()">
+                <option value="">Bill: All</option>
+                <option value="Paid" {% if payment_status == 'Paid' %}selected{% endif %}>Paid</option>
+                <option value="Unpaid" {% if payment_status == 'Unpaid' %}selected{% endif %}>Unpaid</option>
+            </select>
+            {% if status_filter or payment_status or search %}
+                <a href="{{ url_for('customers_list') }}" class="btn btn-outline-secondary">Reset</a>
+            {% endif %}
+        </form>
+    </div>
+
+    {% if current_user and current_user.role == 'Admin' %}
+    <!-- Action Buttons -->
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('export_customers') }}" class="btn btn-outline-orange flex-grow-1 flex-md-grow-0">
+            <i class="bi bi-download me-1"></i> Export CSV
+        </a>
+        <button class="btn btn-outline-secondary flex-grow-1 flex-md-grow-0" data-bs-toggle="modal" data-bs-target="#uploadCustomersModal">
+            <i class="bi bi-upload me-1"></i> Upload CSV
+        </button>
+        <button class="btn btn-orange shadow-sm flex-grow-1 flex-md-grow-0" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
+            <i class="bi bi-person-plus-fill me-1"></i> Add Subscriber
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Quick Status Filter Chips Bar -->
+<div class="filter-chips-bar mb-3">
+    <a href="{{ url_for('customers_list') }}" class="filter-chip {% if not status_filter and not payment_status %}active{% endif %}">
+        <i class="bi bi-people-fill"></i> All Subscribers
+    </a>
+    <a href="{{ url_for('customers_list', status='Active') }}" class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">
+        <i class="bi bi-check-circle-fill text-success"></i> Active
+    </a>
+    <a href="{{ url_for('customers_list', payment='Unpaid') }}" class="filter-chip {% if payment_status == 'Unpaid' %}active{% endif %}">
+        <i class="bi bi-clock-history text-danger"></i> Unpaid Bills
+    </a>
+    <a href="{{ url_for('customers_list', status='Expired') }}" class="filter-chip {% if status_filter == 'Expired' %}active{% endif %}">
+        <i class="bi bi-x-circle-fill text-danger"></i> Expired
+    </a>
+    <a href="{{ url_for('customers_list', status='Suspended') }}" class="filter-chip {% if status_filter == 'Suspended' %}active{% endif %}">
+        <i class="bi bi-pause-circle-fill text-secondary"></i> Suspended
+    </a>
+</div>
+
+<!-- Subscribers Table Card -->
+<div class="table-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-people-fill text-warning me-2"></i> FTTH Subscribers Directory (<span id="customerCountBadge" class="fw-bold">{{ customers|length }}</span>)</span>
+        <span class="badge badge-orange">Sabro FTTH Subscribers</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="customersTable">
+            <thead class="table-light small">
+                <tr>
+                    <th>Customer Name</th>
+                    <th>PPPoE Login</th>
+                    <th>Password</th>
+                    <th>Phone / WhatsApp</th>
+                    <th>Area, Pole & Drop Core</th>
+                    <th>Package</th>
+                    <th>Expiry Date</th>
+                    <th>Status</th>
+                    <th>Bill Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in customers %}
+                <tr>
+                    <td>
+                        <div class="fw-bold text-dark fs-6">{{ c.full_name }}</div>
+                        <div class="small text-muted font-monospace"><i class="bi bi-card-heading text-secondary me-1"></i>{{ c.cnic or 'CNIC Pending' }}</div>
+                    </td>
+                    <td>
+                        <span class="badge badge-orange font-monospace fs-6 px-2 py-1 clickable-copy" onclick="copyToClipboard('{{ c.pppoe_username }}', 'PPPoE Username')" title="Click to copy PPPoE login">
+                            @{{ c.pppoe_username }} <i class="bi bi-copy ms-1" style="font-size: 0.72rem;"></i>
+                        </span>
+                        <div class="small text-muted font-monospace mt-1 clickable-copy" onclick="copyToClipboard('{{ c.onu_serial }}', 'ONT Serial')" title="Click to copy ONT Serial">
+                            <i class="bi bi-router text-warning me-1"></i>{{ c.onu_serial or 'XPON ONT' }}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="font-monospace text-muted small clickable-copy" onclick="copyToClipboard('{{ c.password }}', 'PPPoE Password')" title="Click to copy password">
+                            <i class="bi bi-key-fill text-secondary me-1"></i>{{ c.password }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="fw-semibold text-dark clickable-copy" onclick="copyToClipboard('{{ c.phone }}', 'Phone Number')" title="Click to copy phone">{{ c.phone }}</span>
+                            {% if c.phone %}
+                                <a href="https://wa.me/{{ clean_whatsapp_phone(c.phone) }}" target="_blank" class="text-success ms-1" title="Direct WhatsApp Chat">
+                                    <i class="bi bi-whatsapp"></i>
+                                </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="small fw-semibold text-dark"><i class="bi bi-geo-alt text-danger me-1"></i>{{ c.area }}</div>
+                        <div class="small text-danger fw-semibold"><i class="bi bi-diagram-3 me-1"></i>{{ c.db_box or 'FDB Box' }}</div>
+                        {% if c.fiber_core %}
+                            {% if 'Blue' in c.fiber_core or '1' in c.fiber_core %}
+                                <span class="core-pill core-blue mt-1"><span class="core-dot"></span> {{ c.fiber_core }}</span>
+                            {% elif 'Orange' in c.fiber_core or '2' in c.fiber_core %}
+                                <span class="core-pill core-orange mt-1"><span class="core-dot"></span> {{ c.fiber_core }}</span>
+                            {% elif 'Green' in c.fiber_core or '3' in c.fiber_core %}
+                                <span class="core-pill core-green mt-1"><span class="core-dot"></span> {{ c.fiber_core }}</span>
+                            {% else %}
+                                <span class="core-pill core-brown mt-1"><span class="core-dot"></span> {{ c.fiber_core }}</span>
+                            {% endif %}
+                        {% endif %}
+                        <div class="small text-muted text-truncate mt-1" style="max-width: 170px;">{{ c.address }}</div>
+                    </td>
+                    <td>
+                        <span class="badge bg-dark text-white fw-bold">{{ c.plan_name }}</span>
+                        <div class="small text-muted fw-bold mt-1">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(c.plan_price) }}/mo</div>
+                    </td>
+                    <td>
+                        <div class="fw-semibold small text-dark font-monospace">{{ c.expiry_date }}</div>
+                    </td>
+                    <td>
+                        {% if c.status == 'Active' %}
+                            <span class="badge badge-active"><i class="bi bi-check-circle-fill me-1"></i> Active</span>
+                        {% elif c.status == 'Expired' %}
+                            <span class="badge badge-expired"><i class="bi bi-x-circle-fill me-1"></i> Expired</span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 text-dark">Suspended</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if c.latest_bill_status == 'Paid' %}
+                            <span class="badge badge-paid">PAID</span>
+                        {% else %}
+                            <span class="badge badge-unpaid">UNPAID</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <div class="d-inline-flex gap-1 align-items-center">
+                            {% if current_user and current_user.role == 'Admin' %}
+                            <!-- 1-Click Telecom WhatsApp Welcome -->
+                            <a href="{{ url_for('customer_whatsapp_welcome', id=c.id) }}" target="_blank" class="btn btn-sm btn-outline-success fw-semibold" title="Send Official Telecom WhatsApp Welcome Message">
+                                <i class="bi bi-send-check-fill"></i> <span class="d-none d-xxl-inline">Welcome</span>
+                            </a>
+                            {% endif %}
+
+                            <!-- WhatsApp Reminder (if Unpaid) -->
+                            {% if c.latest_bill_status != 'Paid' and current_user and current_user.role in ['Admin', 'Recovery Boy'] %}
+                            <a href="{{ url_for('customer_whatsapp_reminder', id=c.id) }}" target="_blank" class="btn btn-sm btn-success fw-bold" title="Send WhatsApp Due Bill Reminder">
+                                <i class="bi bi-bell-fill"></i> <span class="d-none d-xl-inline">Remind</span>
+                            </a>
+                            {% endif %}
+
+                            <!-- View Customer Profile Modal Trigger -->
+                            <button type="button" class="btn btn-sm btn-outline-info text-dark" data-bs-toggle="modal" data-bs-target="#viewCustomerModal{{ c.id }}" title="View Customer Profile & FTTH Spec">
+                                <i class="bi bi-eye"></i>
+                            </button>
+
+                            {% if current_user and current_user.role == 'Admin' %}
+                            <!-- Quick Renew 30 Days -->
+                            <form action="{{ url_for('renew_customer', id=c.id) }}" method="POST" class="d-inline">
+                                <input type="hidden" name="days" value="30">
+                                <button type="submit" class="btn btn-sm btn-outline-success" title="Renew Subscription for +30 Days">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                </button>
+                            </form>
+
+                            <!-- Edit Customer Details -->
+                            <button type="button" class="btn btn-sm btn-outline-warning text-dark" data-bs-toggle="modal" data-bs-target="#editCustomerModal{{ c.id }}" title="Edit Customer Details">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+
+                            <!-- Suspend / Activate Toggle -->
+                            <form action="{{ url_for('toggle_customer_status', id=c.id) }}" method="POST" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Toggle Suspend/Active">
+                                    <i class="bi {% if c.status == 'Active' %}bi-pause-fill{% else %}bi-play-fill{% endif %}"></i>
+                                </button>
+                            </form>
+
+                            <!-- Delete -->
+                            <form action="{{ url_for('delete_customer', id=c.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete customer {{ c.full_name }} (@{{ c.pppoe_username }})?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+
+
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" class="text-center py-4 text-muted">
+                        No subscribers found matching your criteria.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+<!-- ================= CUSTOMER MODALS (OUTSIDE TABLE) ================= -->
+{% for c in customers %}
+
+                        <!-- View Customer Profile Modal -->
+                        <div class="modal fade" id="viewCustomerModal{{ c.id }}" tabindex="-1" style="text-align: left;">
+                            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                                        <h5 class="modal-title fw-bold" class="text-dark">
+                                            <i class="bi bi-person-badge me-2" style="color: #ea580c;"></i> FTTH Subscriber Profile: {{ c.full_name }}
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body p-4">
+                                        <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded mb-3 border">
+                                            <div>
+                                                <h5 class="fw-bold text-dark mb-0">{{ c.full_name }}</h5>
+                                                <div class="small font-monospace text-primary">@{{ c.pppoe_username }} &bull; Password: {{ c.password }}</div>
+                                                <div class="small text-muted"><i class="bi bi-card-heading me-1"></i> CNIC: {{ c.cnic or 'Not recorded' }}</div>
+                                            </div>
+                                            <div>
+                                                {% if c.status == 'Active' %}
+                                                    <span class="badge badge-active fs-6">Active</span>
+                                                {% else %}
+                                                    <span class="badge badge-expired fs-6">{{ c.status }}</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+
+                                        <!-- FTTH Carrier Hardware & Splice Spec Card -->
+                                        <div class="card mb-3" style="background-color: #fffbf5;">
+                                            <div class="card-header bg-transparent py-2 fw-bold text-dark small" style="border-bottom: 1px dashed #fed7aa;">
+                                                <i class="bi bi-hdd-network text-warning me-1"></i> FTTH Physical Splice & Optical Device Details
+                                            </div>
+                                            <div class="card-body p-3">
+                                                <div class="row g-2 small">
+                                                    <div class="col-md-6">
+                                                        <div class="text-muted">ONT / ONU Device Serial:</div>
+                                                        <div class="fw-bold font-monospace text-dark">{{ c.onu_serial or 'HWTC-Standard' }}</div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="text-muted">Distribution Box & Pole Location:</div>
+                                                        <div class="fw-bold text-danger">{{ c.db_box or 'Main Street FDB' }}</div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="text-muted">Optical Drop Fiber Core:</div>
+                                                        <div class="fw-bold text-dark">{{ c.fiber_core or 'Core 1 (Blue)' }}</div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="text-muted">Installation / Activation Date:</div>
+                                                        <div class="fw-bold text-dark">{{ c.installation_date or c.created_at }}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="row g-3 small">
+                                            <div class="col-6">
+                                                <div class="text-muted">Contact Phone:</div>
+                                                <div class="fw-bold fs-6">{{ c.phone }}</div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-muted">Package Plan:</div>
+                                                <div class="fw-bold fs-6 text-dark">{{ c.plan_name }} ({{ settings.get('currency', 'PKR') }} {{ c.plan_price }})</div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-muted">Sector / Area:</div>
+                                                <div class="fw-bold">{{ c.area }}</div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-muted">Expiry Date:</div>
+                                                <div class="fw-bold text-danger">{{ c.expiry_date }}</div>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="text-muted">Installation Street Address:</div>
+                                                <div class="fw-semibold text-dark">{{ c.address }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer" style="background-color: #f8fafc;">
+                                        <a href="{{ url_for('customer_whatsapp_welcome', id=c.id) }}" target="_blank" class="btn btn-sm btn-outline-success fw-bold">
+                                            <i class="bi bi-send-check-fill me-1"></i> Welcome WhatsApp
+                                        </a>
+                                        {% if c.latest_bill_status != 'Paid' %}
+                                        <a href="{{ url_for('customer_whatsapp_reminder', id=c.id) }}" target="_blank" class="btn btn-sm btn-warning text-dark fw-bold">
+                                            <i class="bi bi-bell-fill me-1"></i> Due Bill Reminder
+                                        </a>
+                                        {% endif %}
+                                        {% if c.phone %}
+                                        <a href="https://wa.me/{{ clean_whatsapp_phone(c.phone) }}" target="_blank" class="btn btn-sm btn-success fw-bold">
+                                            <i class="bi bi-whatsapp me-1"></i> WhatsApp Chat
+                                        </a>
+                                        {% endif %}
+                                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if current_user and current_user.role == 'Admin' %}
+                        <!-- Edit Customer Modal -->
+                        <div class="modal fade" id="editCustomerModal{{ c.id }}" tabindex="-1" style="text-align: left;">
+                            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <form action="{{ url_for('edit_customer', id=c.id) }}" method="POST">
+                                        <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                                            <h5 class="modal-title fw-bold" class="text-dark">
+                                                <i class="bi bi-pencil-square me-2" style="color: #ea580c;"></i> Edit Subscriber: {{ c.full_name }}
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body p-4">
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">Customer Full Name *</label>
+                                                    <input type="text" name="full_name" class="form-control" value="{{ c.full_name }}" required>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">PPPoE Username *</label>
+                                                    <input type="text" name="pppoe_username" class="form-control font-monospace" value="{{ c.pppoe_username }}" required>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">PPPoE Password *</label>
+                                                    <input type="text" name="password" class="form-control font-monospace" value="{{ c.password }}" required>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">Phone / WhatsApp *</label>
+                                                    <input type="text" name="phone" class="form-control" value="{{ c.phone }}" required>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">National CNIC #</label>
+                                                    <input type="text" name="cnic" class="form-control" value="{{ c.cnic or '' }}" placeholder="42101-1234567-1">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">ONT / ONU Serial No</label>
+                                                    <input type="text" name="onu_serial" class="form-control font-monospace" value="{{ c.onu_serial or '' }}" placeholder="HWTC-XXXXXXXX">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">Distribution Box & Pole #</label>
+                                                    <input type="text" name="db_box" class="form-control" value="{{ c.db_box or '' }}" placeholder="FDB-04, Pole #12">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">Fiber Drop Core Color</label>
+                                                    <input type="text" name="fiber_core" class="form-control" value="{{ c.fiber_core or '' }}" placeholder="Core 1 (Blue) / Core 2 (Orange)">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">Package Plan *</label>
+                                                    <select name="tariff_id" class="form-select" required>
+                                                        {% for t in tariffs %}
+                                                            <option value="{{ t.id }}" {% if c.tariff_id == t.id %}selected{% endif %}>
+                                                                {{ t.name }} ({{ t.speed_mb }} MB) - {{ settings.get('currency', 'PKR') }} {{ t.price }}/mo
+                                                            </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">Area / Sector *</label>
+                                                    <input type="text" name="area" class="form-control" value="{{ c.area }}" required>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">Account Status *</label>
+                                                    <select name="status" class="form-select" required>
+                                                        <option value="Active" {% if c.status == 'Active' %}selected{% endif %}>Active</option>
+                                                        <option value="Expired" {% if c.status == 'Expired' %}selected{% endif %}>Expired</option>
+                                                        <option value="Suspended" {% if c.status == 'Suspended' %}selected{% endif %}>Suspended</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">Expiry Date *</label>
+                                                    <input type="date" name="expiry_date" class="form-control" value="{{ c.expiry_date }}" required>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold">Installation Date</label>
+                                                    <input type="date" name="installation_date" class="form-control" value="{{ c.installation_date or '' }}">
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label fw-bold">Full Street Address *</label>
+                                                    <textarea name="address" class="form-control" rows="2" required>{{ c.address }}</textarea>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer" style="background-color: #f8fafc;">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-orange px-4"><i class="bi bi-check-lg me-1"></i> Save Changes</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+{% endfor %}
+</div>
+
+{% if current_user and current_user.role == 'Admin' %}
+<!-- Add Customer Modal -->
+<div class="modal fade" id="addCustomerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form action="{{ url_for('add_customer') }}" method="POST">
+                <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                    <h5 class="modal-title fw-bold" class="text-dark">
+                        <i class="bi bi-person-plus-fill me-2" style="color: #ea580c;"></i> Add New FTTH Subscriber
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Customer Full Name *</label>
+                            <input type="text" name="full_name" class="form-control" required placeholder="e.g. Asif Mehmood">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">PPPoE Username *</label>
+                            <input type="text" name="pppoe_username" class="form-control font-monospace" required placeholder="e.g. asif.pppoe">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">PPPoE Password *</label>
+                            <input type="text" name="password" class="form-control font-monospace" required value="123456">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Phone / WhatsApp Number *</label>
+                            <input type="text" name="phone" class="form-control" required placeholder="0300-1234567">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">FTTH Speed Package *</label>
+                            <select name="tariff_id" class="form-select" required>
+                                {% for t in tariffs %}
+                                    <option value="{{ t.id }}" {% if t.speed_mb == 15 %}selected{% endif %}>
+                                        {{ t.name }} ({{ t.speed_mb }} MB) - {{ settings.get('currency', 'PKR') }} {{ t.price }}/month
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Area / Sector *</label>
+                            <input type="text" name="area" class="form-control" required placeholder="e.g. Sector A, Street 5">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">National CNIC #</label>
+                            <input type="text" name="cnic" class="form-control" placeholder="42101-1234567-1">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">ONT / ONU Serial No</label>
+                            <input type="text" name="onu_serial" class="form-control font-monospace" placeholder="e.g. HWTC-88992211">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Distribution Box / Pole #</label>
+                            <input type="text" name="db_box" class="form-control" placeholder="e.g. FDB-03, Pole #09">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Fiber Drop Core Color</label>
+                            <select name="fiber_core" class="form-select">
+                                <option value="Core 1 (Blue)" selected>Core 1 (Blue)</option>
+                                <option value="Core 2 (Orange)">Core 2 (Orange)</option>
+                                <option value="Core 3 (Green)">Core 3 (Green)</option>
+                                <option value="Core 4 (Brown)">Core 4 (Brown)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Initial Bill Status *</label>
+                            <select name="initial_payment" class="form-select">
+                                <option value="Paid">Mark as PAID (Received Now)</option>
+                                <option value="Unpaid" selected>Mark as UNPAID (Due Bill)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">ONU Security Deposit (Optional)</label>
+                            <input type="number" name="onu_deposit" class="form-control" value="2500" placeholder="e.g. 2500">
+                            <div class="small text-muted">Will be recorded in Deposits Ledger</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Installation Complete Street Address *</label>
+                            <textarea name="address" class="form-control" rows="2" required placeholder="House / Flat / Shop #, Street, Near landmark..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background-color: #f8fafc;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-orange px-4"><i class="bi bi-check-lg me-1"></i> Register Subscriber</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+<!-- Upload & Import Customers CSV Modal -->
+<div class="modal fade" id="uploadCustomersModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('import_customers') }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-header bg-white border-bottom">
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi bi-file-earmark-spreadsheet-fill text-success me-2"></i> Upload Customers CSV
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted small mb-3">
+                        Upload a spreadsheet (.csv) containing subscriber records. The system automatically reads columns such as <strong>Customer Name, PPPoE Username, Phone, Address, Area, Package</strong>.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Select CSV File *</label>
+                        <input type="file" name="csv_file" class="form-control" accept=".csv" required>
+                    </div>
+                    <div class="p-3 bg-light rounded-3 border small text-muted">
+                        <div class="fw-bold text-dark mb-1"><i class="bi bi-info-circle text-primary me-1"></i> Supported Column Headers:</div>
+                        <code>Customer Name, PPPoE Username, Phone, Address, Area, Plan, FDB Box, Fiber Core</code>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success fw-bold px-4">
+                        <i class="bi bi-cloud-arrow-up-fill me-1"></i> Upload & Import
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Attach Instant Live Search on Customers Table with Counter Badge
+    attachLiveSearch('customerSearch', 'customersTable', 'customerCountBadge');
+</script>
+{% endblock %}

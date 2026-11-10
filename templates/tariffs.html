@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block page_title %}FTTH Speed Packages & Tariffs Management{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3 mb-4">
+    <div>
+        <h4 class="fw-bold mb-1" class="text-dark">{{ settings.get('isp_name', 'Sabro Networks') }} (FTTH)</h4>
+        <p class="text-muted mb-0">Manage broadband fiber internet packages, edit package names, adjust monthly subscription prices, or add new packages.</p>
+    </div>
+    <button class="btn btn-orange shadow-sm flex-grow-1 flex-md-grow-0" data-bs-toggle="modal" data-bs-target="#addPackageModal">
+        <i class="bi bi-plus-circle me-1"></i> Add New Package
+    </button>
+</div>
+
+<!-- Package Cards Grid -->
+<div class="row g-4">
+    {% for t in tariffs %}
+    <div class="col-md-6 col-xl-3">
+        <div class="stat-card h-100 d-flex flex-column justify-content-between position-relative" style="border-top: 5px solid #ea580c;">
+            <div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge badge-orange fs-6">{{ t.speed_mb }} MB</span>
+                    <span class="badge bg-light text-dark border"><i class="bi bi-people me-1"></i> {{ t.subscriber_count }} users</span>
+                </div>
+                <h5 class="fw-bold mb-1 text-dark">{{ t.name }}</h5>
+                <p class="text-muted small mb-3">{{ t.description or 'High-speed FTTH Optical Fiber' }}</p>
+                
+                <div class="p-3 bg-light rounded-3 mb-3 border">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Fiber Speed:</span>
+                        <strong class="text-dark">{{ t.speed_mb }} Mbps Unlimited</strong>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="text-muted">Service Type:</span>
+                        <strong class="text-danger">FTTH Optical Fiber</strong>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="pt-3 border-top">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <span class="fs-4 fw-bold" style="color: #ea580c;">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(t.price) }}</span>
+                        <span class="text-muted small">/month</span>
+                    </div>
+                    <span class="badge badge-paid"><i class="bi bi-check-circle me-1"></i> Active</span>
+                </div>
+
+                <!-- Edit and Delete Actions -->
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-warning w-100 fw-semibold text-dark" data-bs-toggle="modal" data-bs-target="#editModal{{ t.id }}">
+                        <i class="bi bi-pencil-square me-1"></i> Edit Plan
+                    </button>
+                    {% if t.subscriber_count == 0 %}
+                    <form action="{{ url_for('delete_tariff', id=t.id) }}" method="POST" onsubmit="return confirm('Delete package {{ t.name }}?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endfor %}
+</div>
+
+
+
+<!-- ================= EDIT TARIFF MODALS (OUTSIDE GRID) ================= -->
+{% for t in tariffs %}
+<!-- Edit Modal for each Tariff -->
+    <div class="modal fade" id="editModal{{ t.id }}" tabindex="-1">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <form action="{{ url_for('edit_tariff', id=t.id) }}" method="POST">
+                    <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                        <h5 class="modal-title fw-bold" class="text-dark">
+                            <i class="bi bi-pencil-square me-2" style="color: #ea580c;"></i> Edit Package: {{ t.name }}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Package Name *</label>
+                            <input type="text" name="name" class="form-control fw-bold" value="{{ t.name }}" required>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Speed (MB) *</label>
+                                <input type="number" name="speed_mb" class="form-control" value="{{ t.speed_mb }}" required min="1">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Monthly Price (PKR) *</label>
+                                <input type="number" name="price" class="form-control" value="{{ t.price|int }}" required min="1">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Package Description</label>
+                            <textarea name="description" class="form-control" rows="2">{{ t.description }}</textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="background-color: #f8fafc;">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-orange px-4"><i class="bi bi-check-lg me-1"></i> Update Package</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endfor %}
+
+<!-- Add Package Modal -->
+<div class="modal fade" id="addPackageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <form action="{{ url_for('add_tariff') }}" method="POST">
+                <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                    <h5 class="modal-title fw-bold" class="text-dark">
+                        <i class="bi bi-plus-circle me-2" style="color: #ea580c;"></i> Create New FTTH Package
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Package Name *</label>
+                        <input type="text" name="name" class="form-control" required placeholder="e.g. 30 MB Gaming Ultra Plan">
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Speed (MB) *</label>
+                            <input type="number" name="speed_mb" class="form-control" required value="30" min="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Monthly Price (PKR) *</label>
+                            <input type="number" name="price" class="form-control" required value="2200" min="1">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Description</label>
+                        <textarea name="description" class="form-control" rows="2" placeholder="e.g. Low latency fiber for streaming and online gaming"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background-color: #f8fafc;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-orange px-4"><i class="bi bi-check-lg me-1"></i> Save Package</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

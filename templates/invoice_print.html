@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bill Slip {{ invoice.invoice_number }} - {{ settings.get('isp_name', 'Sabro Networks') }}</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/sabro_logo.jpg') }}">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        /* Cost-Saving Black & White High-Contrast Monochrome Design */
+        body {
+            background-color: #f1f5f9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            color: #000000;
+            padding: 20px 10px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .invoice-card {
+            max-width: 680px;
+            margin: 15px auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 6px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            border: 2px solid #000000;
+            position: relative;
+            color: #000000;
+        }
+        /* Centered Grayscale Logo (Ink/Toner Cost Saver) */
+        .invoice-logo {
+            width: 78px;
+            height: 78px;
+            object-fit: cover;
+            border-radius: 50%;
+            border: 2px solid #000000;
+            filter: grayscale(100%) contrast(125%);
+            display: block;
+            margin: 0 auto 10px auto;
+        }
+        /* Monochrome Stamp */
+        .stamp {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            font-size: 1.25rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            padding: 4px 14px;
+            border-radius: 4px;
+            letter-spacing: 2px;
+            transform: rotate(-5deg);
+        }
+        .stamp-paid {
+            border: 2.5px solid #000000;
+            color: #000000;
+            background: #ffffff;
+        }
+        .stamp-unpaid {
+            border: 2.5px dashed #000000;
+            color: #000000;
+            background: #ffffff;
+        }
+        /* High Contrast Monochrome Table */
+        .table-bw {
+            width: 100%;
+            border-collapse: collapse;
+            color: #000000;
+        }
+        .table-bw th, .table-bw td {
+            border: 1px solid #000000 !important;
+            padding: 8px 10px;
+        }
+        .table-bw thead th {
+            background-color: #f8fafc !important;
+            color: #000000 !important;
+            font-weight: 700;
+            border-bottom: 2px solid #000000 !important;
+        }
+        .barcode-box {
+            font-family: monospace;
+            letter-spacing: 5px;
+            font-weight: bold;
+            font-size: 1.05rem;
+            background: #ffffff;
+            padding: 5px 12px;
+            display: inline-block;
+            border: 1px solid #000000;
+            border-radius: 4px;
+            color: #000000;
+        }
+        /* 80mm Thermal Slip Mode Toggle */
+        .thermal-mode {
+            max-width: 380px !important;
+            padding: 15px !important;
+            border-radius: 0 !important;
+            border: 1px dashed #000000 !important;
+            box-shadow: none !important;
+            font-size: 0.88rem !important;
+        }
+        .thermal-mode .invoice-logo {
+            width: 52px !important;
+            height: 52px !important;
+            margin-bottom: 6px !important;
+        }
+        .thermal-mode .stamp {
+            position: static !important;
+            display: block !important;
+            text-align: center !important;
+            margin: 8px auto !important;
+            transform: none !important;
+            width: fit-content;
+        }
+
+        /* Strict Black and White Print Media Rules */
+        @media print {
+            body {
+                background: #ffffff !important;
+                color: #000000 !important;
+                padding: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .invoice-card {
+                box-shadow: none !important;
+                border: 1.5px solid #000000 !important;
+                margin: 0 auto !important;
+                padding: 15px !important;
+                max-width: 100% !important;
+                filter: grayscale(100%) !important;
+            }
+            .thermal-mode {
+                max-width: 80mm !important;
+                border: none !important;
+                padding: 0 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Print & Action Controls (Hidden on Print) -->
+    <div class="text-center mb-3 no-print d-flex flex-wrap justify-content-center gap-2">
+        <button onclick="window.print()" class="btn btn-dark px-4 shadow-sm fw-bold">
+            <i class="bi bi-printer-fill me-1"></i> Print Bill (Black & White)
+        </button>
+        <button onclick="toggleThermalMode()" id="thermalBtn" class="btn btn-outline-dark px-3 shadow-sm fw-semibold">
+            <i class="bi bi-receipt me-1"></i> 80mm Thermal Slip View
+        </button>
+        <a href="{{ url_for('whatsapp_invoice', id=invoice.id) }}" target="_blank" class="btn btn-success px-4 shadow-sm fw-bold">
+            <i class="bi bi-whatsapp me-1"></i> Send on Customer WhatsApp
+        </a>
+        <button onclick="window.close()" class="btn btn-outline-secondary px-3">
+            Close
+        </button>
+    </div>
+
+    <div class="invoice-card" id="invoiceCard">
+        <!-- Stamp -->
+        {% if invoice.status == 'Paid' %}
+            <div class="stamp stamp-paid"><i class="bi bi-check2-circle me-1"></i>PAID</div>
+        {% else %}
+            <div class="stamp stamp-unpaid"><i class="bi bi-clock-history me-1"></i>UNPAID</div>
+        {% endif %}
+
+        <!-- Centered Header with Centered Logo -->
+        <div class="text-center pb-3 mb-4 border-bottom border-dark">
+            <img src="{{ url_for('static', filename='img/sabro_logo.jpg') }}" alt="Sabro Networks Logo" class="invoice-logo shadow-sm">
+            <div class="d-inline-flex align-items-center justify-content-center gap-2 mb-1">
+                <span class="badge border border-dark text-dark bg-white fw-bold px-2 py-0" style="font-size: 0.72rem; letter-spacing: 0.5px;">FTTH</span>
+                <h3 class="fw-bold mb-0 text-dark" style="letter-spacing: 0.5px; font-size: 1.55rem;">{{ settings.get('isp_name', 'Sabro Networks') }}</h3>
+            </div>
+            <div class="small text-dark mt-1" style="font-weight: 600;">{{ settings.get('tagline', 'High-Speed Optical Fiber Internet (FTTH)') }}</div>
+            <div class="small text-dark mt-1">
+                <i class="bi bi-telephone-fill me-1"></i> Helpline: <strong>{{ settings.get('phone', '0300-1234567') }}</strong> &bull; <i class="bi bi-envelope-fill me-1"></i> {{ settings.get('email', 'info@sabronetworks.com') }}
+            </div>
+            <div class="small text-muted"><i class="bi bi-geo-alt-fill me-1"></i> {{ settings.get('address', 'Main Fiber Exchange Hub, Pakistan') }}</div>
+        </div>
+
+        <!-- Meta Details: Two Columns (Billed Customer & Bill Info) -->
+        <div class="row mb-3">
+            <div class="col-6">
+                <div class="small text-uppercase fw-bold text-dark border-bottom border-dark pb-1 mb-2">Customer Name:</div>
+                <h4 class="fw-bold mb-1 text-dark">{{ invoice.full_name }}</h4>
+                <div class="small text-muted"><i class="bi bi-telephone me-1"></i> {{ invoice.phone }}</div>
+                <div class="small text-dark">{{ invoice.area }}</div>
+            </div>
+            <div class="col-6 text-end">
+                <div class="small text-uppercase fw-bold text-dark border-bottom border-dark pb-1 mb-2">Bill Details:</div>
+                <div class="fw-bold font-monospace fs-6 text-dark">{{ invoice.invoice_number }}</div>
+                <div class="small">Billing Month: <strong>{{ invoice.month_period }}</strong></div>
+                <div class="small">Issue Date: {{ invoice.created_at }}</div>
+                <div class="small">Due Date: <strong>{{ invoice.due_date }}</strong></div>
+            </div>
+        </div>
+
+        <!-- Details Table (Clean Black & White: Package & Total Amount) -->
+        <table class="table-bw mb-3">
+            <thead>
+                <tr>
+                    <th>Internet Package</th>
+                    <th class="text-end">Total Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <div class="fw-bold text-dark fs-6">{{ invoice.plan_name }}</div>
+                        <div class="small text-muted">{{ invoice.speed_mb }} Mbps Unlimited High-Speed Fiber Internet</div>
+                    </td>
+                    <td class="text-end fw-bold text-dark fs-6">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(invoice.amount) }}</td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr style="border-top: 2px solid #000000;">
+                    <th class="text-end fw-bold fs-6">Total Amount Payable:</th>
+                    <th class="text-end fs-4 fw-bold text-dark">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(invoice.amount) }}</th>
+                </tr>
+                {% if invoice.status == 'Paid' %}
+                <tr style="border-top: 1px dashed #000000;">
+                    <td class="text-end fw-bold">Amount Paid ({{ invoice.payment_method or 'Cash' }}):</td>
+                    <td class="text-end fw-bold text-success">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(invoice.amount) }}</td>
+                </tr>
+                {% endif %}
+            </tfoot>
+        </table>
+
+        <!-- Online Payment Instructions (Black & White Box) -->
+        {% if invoice.status != 'Paid' %}
+        <div class="p-2 px-3 mb-3 border border-dark rounded bg-white">
+            <div class="fw-bold mb-1 text-dark small">
+                <i class="bi bi-wallet2 me-1"></i> Online Payment Accounts:
+            </div>
+            <div class="row g-2 small">
+                <div class="col-md-6">
+                    <strong>JazzCash:</strong> {{ settings.get('jazzcash_no', '0300-1234567') }}
+                </div>
+                <div class="col-md-6">
+                    <strong>EasyPaisa:</strong> {{ settings.get('easypaisa_no', '0300-1234567') }}
+                </div>
+                <div class="col-12">
+                    <strong>Bank:</strong> {{ settings.get('bank_info', 'Meezan Bank') }}
+                </div>
+            </div>
+            <div class="small text-muted mt-1" style="font-size: 0.78rem;">
+                * Send transaction receipt on WhatsApp: <strong>{{ settings.get('phone', '0300-1234567') }}</strong> after payment.
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Verification Barcode & Signatures -->
+        <div class="d-flex justify-content-between align-items-end pt-3 border-top border-dark">
+            <div>
+                <div class="barcode-box mb-1">||| {{ invoice.invoice_number }} |||</div>
+                <div class="text-muted small" style="font-size: 0.72rem;">Computer generated bill &bull; {{ settings.get('isp_name', 'Sabro Networks') }}</div>
+            <div class="text-muted mt-1" style="font-size: 0.64rem; letter-spacing: 0.3px;">Engineered & Built by <strong>{{ settings.get('agency_name', 'Vshatkay Solutions') }}</strong> &bull; Agency</div>
+            </div>
+            <div class="text-end">
+                <div class="fw-bold text-dark" style="font-size: 0.85rem; border-top: 1px solid #000000; padding-top: 2px;">Authorized Signature</div>
+                <div class="text-muted small" style="font-size: 0.75rem;">Sabro Networks Billing Desk</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleThermalMode() {
+            const card = document.getElementById('invoiceCard');
+            const btn = document.getElementById('thermalBtn');
+            card.classList.toggle('thermal-mode');
+            if (card.classList.contains('thermal-mode')) {
+                btn.innerHTML = '<i class="bi bi-file-earmark-text me-1"></i> Full Voucher View';
+            } else {
+                btn.innerHTML = '<i class="bi bi-receipt me-1"></i> 80mm Thermal Slip View';
+            }
+        }
+    </script>
+</body>
+</html>

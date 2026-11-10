@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="adminGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ea580c" />
+      <stop offset="100%" stop-color="#f97316" />
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="48" fill="url(#adminGrad)" stroke="url(#ringGrad)" stroke-width="4"/>
+  <circle cx="50" cy="36" r="16" fill="#f8fafc" opacity="0.95"/>
+  <path d="M22 80 C22 62, 34 56, 50 56 C66 56, 78 62, 78 80 Z" fill="#f8fafc" opacity="0.95"/>
+  <path d="M42 20 L50 26 L58 20 L56 30 L44 30 Z" fill="#ea580c"/>
+  <circle cx="80" cy="80" r="14" fill="#ea580c" stroke="#ffffff" stroke-width="2"/>
+  <path d="M76 80 L79 83 L85 77" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round"/>
+</svg>

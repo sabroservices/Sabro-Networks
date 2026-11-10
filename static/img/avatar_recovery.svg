@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="recGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="48" fill="url(#recGrad)" stroke="#10b981" stroke-width="4"/>
+  <circle cx="50" cy="36" r="16" fill="#ecfdf5" opacity="0.95"/>
+  <path d="M22 80 C22 62, 34 56, 50 56 C66 56, 78 62, 78 80 Z" fill="#ecfdf5" opacity="0.95"/>
+  <!-- Cash Collection Coin on bottom right -->
+  <circle cx="80" cy="80" r="14" fill="#10b981" stroke="#ffffff" stroke-width="2"/>
+  <text x="80" y="85" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle" font-family="sans-serif">Rs</text>
+</svg>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="compGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1c1917" />
+      <stop offset="100%" stop-color="#292524" />
+    </linearGradient>
+    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="48" fill="url(#compGrad)" stroke="#f59e0b" stroke-width="4"/>
+  <circle cx="50" cy="36" r="16" fill="#fef3c7" opacity="0.95"/>
+  <path d="M22 80 C22 62, 34 56, 50 56 C66 56, 78 62, 78 80 Z" fill="#fef3c7" opacity="0.95"/>
+  <!-- Safety Helmet / Cap -->
+  <path d="M32 32 C32 20, 68 20, 68 32 Z" fill="#f59e0b"/>
+  <!-- Level Badge Star on bottom right -->
+  <circle cx="80" cy="80" r="15" fill="url(#starGrad)" stroke="#ffffff" stroke-width="2"/>
+  <polygon points="80,70 83,76 89,77 85,82 86,88 80,85 74,88 75,82 71,77 77,76" fill="#ffffff"/>
+</svg>

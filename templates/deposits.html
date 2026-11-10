@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block page_title %}Deposits & Advances (ONU / Router Security){% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3 mb-4">
+    <div class="input-group flex-grow-1" style="max-width: 540px;">
+        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-warning"></i></span>
+        <input type="text" id="depositSearch" class="form-control border-start-0" placeholder="Type here to search customer, PPPoE user, deposit type, notes...">
+    </div>
+    <button class="btn btn-orange shadow-sm flex-grow-1 flex-md-grow-0" data-bs-toggle="modal" data-bs-target="#addDepositModal">
+        <i class="bi bi-shield-plus me-1"></i> Receive New Security Deposit
+    </button>
+</div>
+
+<!-- Financial Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4">
+        <div class="stat-card border-success">
+            <div class="text-muted small fw-semibold text-uppercase">Total Held Security Deposits</div>
+            <div class="fs-4 fw-bold mt-1 text-success">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(total_held) }}</div>
+            <div class="small text-muted mt-1"><i class="bi bi-lock-fill text-success"></i> Refundable device reserves</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="stat-card border-secondary">
+            <div class="text-muted small fw-semibold text-uppercase">Total Returned / Refunded</div>
+            <div class="fs-4 fw-bold mt-1 text-secondary">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(total_refunded) }}</div>
+            <div class="small text-muted mt-1"><i class="bi bi-arrow-return-left text-secondary"></i> On device handover</div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="stat-card">
+            <div class="text-muted small fw-semibold text-uppercase">Total Deposit Records</div>
+            <div class="fs-4 fw-bold mt-1 text-dark">{{ deposits|length }} Subscribers</div>
+            <div class="small text-muted mt-1"><i class="bi bi-router-fill text-warning"></i> Active customer devices</div>
+        </div>
+    </div>
+</div>
+
+<!-- Deposits Table -->
+<div class="table-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-shield-lock-fill text-warning me-2"></i> ONU Security & Device Deposits Ledger (<span id="depositCountBadge" class="fw-bold">{{ deposits|length }}</span>)</span>
+        <span class="badge badge-orange">Equipment Reserve</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="depositsTable">
+            <thead class="table-light small">
+                <tr>
+                    <th>Customer Name</th>
+                    <th>PPPoE User</th>
+                    <th>Deposit Type</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Notes</th>
+                    <th class="text-end">Quick Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in deposits %}
+                <tr>
+                    <td>
+                        <div class="fw-bold text-dark">{{ d.full_name }}</div>
+                        <div class="small text-muted">{{ d.phone }} &bull; {{ d.area }}</div>
+                    </td>
+                    <td>
+                        <span class="badge badge-orange font-monospace">@{{ d.pppoe_username }}</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark border">{{ d.deposit_type }}</span>
+                    </td>
+                    <td>
+                        <div class="fs-6 fw-bold text-success">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(d.amount) }}</div>
+                    </td>
+                    <td>
+                        {% if d.status == 'Held' %}
+                            <span class="badge badge-paid"><i class="bi bi-lock-fill me-1"></i> HELD</span>
+                        {% elif d.status == 'Refunded' %}
+                            <span class="badge bg-secondary"><i class="bi bi-arrow-return-left me-1"></i> REFUNDED</span>
+                        {% else %}
+                            <span class="badge bg-info text-dark"><i class="bi bi-check2-all me-1"></i> ADJUSTED</span>
+                        {% endif %}
+                    </td>
+                    <td class="small text-dark">{{ d.date }}</td>
+                    <td class="small text-muted">{{ d.notes or '-' }}</td>
+                    <td class="text-end">
+                        <div class="d-inline-flex gap-1 align-items-center flex-nowrap">
+                            <!-- Quick Status Update -->
+                            <form action="{{ url_for('update_deposit_status', id=d.id) }}" method="POST" class="d-inline">
+                                <select name="status" class="form-select form-select-sm" style="width: 110px;" onchange="this.form.submit()">
+                                    <option value="Held" {% if d.status == 'Held' %}selected{% endif %}>Held</option>
+                                    <option value="Refunded" {% if d.status == 'Refunded' %}selected{% endif %}>Refunded</option>
+                                    <option value="Adjusted" {% if d.status == 'Adjusted' %}selected{% endif %}>Adjusted</option>
+                                </select>
+                            </form>
+
+                            <!-- Edit Deposit Button -->
+                            <button type="button" class="btn btn-sm btn-outline-warning text-dark" data-bs-toggle="modal" data-bs-target="#editDepositModal{{ d.id }}" title="Edit Deposit Record">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+                        </div>
+
+
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-muted">No deposit records found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ================= EDIT DEPOSIT MODALS (OUTSIDE TABLE) ================= -->
+{% for d in deposits %}
+                        <!-- Edit Deposit Modal -->
+                        <div class="modal fade" id="editDepositModal{{ d.id }}" tabindex="-1" style="text-align: left;">
+                            <div class="modal-dialog modal-dialog-scrollable">
+                                <div class="modal-content">
+                                    <form action="{{ url_for('edit_deposit', id=d.id) }}" method="POST">
+                                        <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                                            <h5 class="modal-title fw-bold" class="text-dark">
+                                                <i class="bi bi-pencil-square me-2" style="color: #ea580c;"></i> Edit Deposit: {{ d.full_name }}
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body p-4">
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Customer</label>
+                                                <input type="text" class="form-control bg-light" value="{{ d.full_name }} (@{{ d.pppoe_username }})" readonly>
+                                            </div>
+                                            <div class="row g-2 mb-3">
+                                                <div class="col-6">
+                                                    <label class="form-label fw-bold">Deposit Type *</label>
+                                                    <select name="deposit_type" class="form-select" required>
+                                                        <option value="ONU Security Deposit" {% if d.deposit_type == 'ONU Security Deposit' %}selected{% endif %}>ONU Security Deposit</option>
+                                                        <option value="Fiber Router Advance" {% if d.deposit_type == 'Fiber Router Advance' %}selected{% endif %}>Fiber Router Advance</option>
+                                                        <option value="Installation Advance" {% if d.deposit_type == 'Installation Advance' %}selected{% endif %}>Installation Advance</option>
+                                                        <option value="Security Deposit" {% if d.deposit_type == 'Security Deposit' %}selected{% endif %}>General Security</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label fw-bold">Amount (PKR) *</label>
+                                                    <input type="number" name="amount" class="form-control fw-bold text-success" value="{{ d.amount|int }}" required min="1">
+                                                </div>
+                                            </div>
+                                            <div class="row g-2 mb-3">
+                                                <div class="col-6">
+                                                    <label class="form-label fw-bold">Status *</label>
+                                                    <select name="status" class="form-select" required>
+                                                        <option value="Held" {% if d.status == 'Held' %}selected{% endif %}>Held (Active Guarantee)</option>
+                                                        <option value="Refunded" {% if d.status == 'Refunded' %}selected{% endif %}>Refunded (Returned to Customer)</option>
+                                                        <option value="Adjusted" {% if d.status == 'Adjusted' %}selected{% endif %}>Adjusted in Bill</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label fw-bold">Date *</label>
+                                                    <input type="date" name="date" class="form-control" value="{{ d.date }}" required>
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Device Serial / Notes</label>
+                                                <textarea name="notes" class="form-control" rows="2">{{ d.notes or '' }}</textarea>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer" style="background-color: #f8fafc;">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-orange px-4"><i class="bi bi-check-lg me-1"></i> Update Deposit</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+
+{% endfor %}
+
+<!-- Add Deposit Modal -->
+<div class="modal fade" id="addDepositModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <form action="{{ url_for('deposits_page') }}" method="POST">
+                <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
+                    <h5 class="modal-title fw-bold" class="text-dark">
+                        <i class="bi bi-shield-plus me-2" style="color: #ea580c;"></i> Record Device / Security Deposit
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Select Customer *</label>
+                        <select name="customer_id" class="form-select" required>
+                            <option value="">-- Choose Customer --</option>
+                            {% for c in customers %}
+                                <option value="{{ c.id }}">{{ c.full_name }} (@{{ c.pppoe_username }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Deposit Type *</label>
+                            <select name="deposit_type" class="form-select" required>
+                                <option value="ONU Security Deposit" selected>ONU Security Deposit</option>
+                                <option value="Fiber Router Advance">Fiber Router Advance</option>
+                                <option value="Installation Advance">Installation Advance</option>
+                                <option value="Security Deposit">General Security Deposit</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Deposit Amount (PKR) *</label>
+                            <input type="number" name="amount" class="form-control fw-bold text-success" required value="2500">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Date *</label>
+                        <input type="date" name="date" id="depositDateInput" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">ONU / Router Serial Number & Notes</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="e.g. Huawei HG8310M ONU, Serial: HWTC-78901234"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background-color: #f8fafc;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-orange px-4"><i class="bi bi-check-lg me-1"></i> Save Deposit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Attach Instant Live Search on Deposits Table with Counter Badge
+    attachLiveSearch('depositSearch', 'depositsTable', 'depositCountBadge');
+
+    const depDate = document.getElementById('depositDateInput');
+    if (depDate && !depDate.value) {
+        depDate.value = new Date().toISOString().split('T')[0];
+    }
+</script>
+{% endblock %}

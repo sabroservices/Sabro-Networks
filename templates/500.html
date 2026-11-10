@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block page_title %}Internal Server Error (500){% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-6 text-center">
+        <div class="stat-card p-5 border-danger">
+            <img src="{{ url_for('static', filename='img/sabro_logo.jpg') }}" alt="Sabro Networks" class="rounded-circle mb-3 shadow" style="width: 72px; height: 72px; object-fit: cover; border: 2px solid #ea580c;">
+            <h1 class="display-4 fw-bold text-danger">500</h1>
+            <h4 class="fw-bold mb-2">Temporary System Notice</h4>
+            <p class="text-muted mb-4">
+                An unexpected server condition occurred. The database is protected and all transactions remain safe. Please refresh or return to the dashboard.
+            </p>
+            <div class="d-flex justify-content-center gap-2">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-orange px-4 py-2 shadow-sm">
+                    <i class="bi bi-arrow-clockwise me-1"></i> Return to Dashboard
+                </a>
+                <a href="javascript:location.reload()" class="btn btn-outline-secondary px-3 py-2">
+                    Reload Page
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
