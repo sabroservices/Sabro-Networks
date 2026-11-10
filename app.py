@@ -287,7 +287,7 @@ def inject_globals():
 @app.before_request
 def require_login():
     # Allow login, static files, and public invoice print views without authentication
-    allowed_endpoints = ['login', 'static', 'print_invoice']
+    allowed_endpoints = ['login', 'static', 'print_invoice', 'health_diagnostic']
     if request.endpoint not in allowed_endpoints and not session.get('user_id'):
         return redirect(url_for('login'))
 
@@ -380,6 +380,19 @@ def login():
             flash("Invalid username or password. Please try again.", "danger")
 
     return render_template("login.html")
+
+@app.route("/health")
+def health_diagnostic():
+    login_path = os.path.join(app.template_folder, "login.html")
+    templates_list = os.listdir(app.template_folder) if os.path.exists(app.template_folder) else []
+    return {
+        "status": "online",
+        "system": "Sabro Networks FTTH",
+        "base_dir": BASE_DIR,
+        "template_folder": app.template_folder,
+        "templates_found": len(templates_list),
+        "login_html_exists": os.path.exists(login_path)
+    }
 
 @app.route("/logout")
 def logout():
