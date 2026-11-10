@@ -1,9 +1,9 @@
 @echo off
-title Push All Fixes to GitHub
+title Push Sabro Networks to GitHub
 color 0a
 
 echo =====================================================================
-echo   Pushing all 6 bug fixes to GitHub...
+echo   Pushing Sabro Networks to https://github.com/sabroservices/Sabro-Networks
 echo =====================================================================
 echo.
 
@@ -15,12 +15,13 @@ if not exist "%GIT_PATH%" set "GIT_PATH=git"
 if %errorlevel% equ 0 (
     echo.
     echo =====================================================================
-    echo   [SUCCESS] All fixes uploaded to GitHub!
-    echo   Render is now automatically updating your live website!
+    echo   [SUCCESS] Uploaded to GitHub successfully!
     echo =====================================================================
 ) else (
     echo.
-    echo [ERROR] Push failed. If a browser window opened, please authorize GitHub.
+    echo =====================================================================
+    echo   [NOTE] If authentication is needed, please approve the browser prompt.
+    echo =====================================================================
 )
 
 echo.
