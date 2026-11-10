@@ -2,15 +2,33 @@ import sqlite3
 import os
 from datetime import datetime, timedelta
 
-DB_PATH = os.environ.get("SABRO_DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "sabro_isp.db"))
+# Detect serverless execution environment (e.g., Vercel, AWS Lambda)
+is_serverless = os.environ.get("VERCEL") == "1" or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") is not None
+if is_serverless:
+    DB_PATH = os.environ.get("SABRO_DB_PATH", "/tmp/sabro_isp.db")
+else:
+    DB_PATH = os.environ.get("SABRO_DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "sabro_isp.db"))
 
 def get_db():
+    # Auto-initialize database on cold start in serverless environments
+    if is_serverless and not os.path.exists(DB_PATH):
+        init_db(force_reset=False)
+
     conn = sqlite3.connect(DB_PATH, timeout=25.0)
     conn.row_factory = sqlite3.Row
-    # Enable WAL mode and robust timeout for high concurrency in production
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA busy_timeout=25000;")
-    conn.execute("PRAGMA foreign_keys=ON;")
+    # Enable WAL mode if supported, fallback to DELETE mode on restricted serverless filesystems
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+    except Exception:
+        try:
+            conn.execute("PRAGMA journal_mode=DELETE;")
+        except Exception:
+            pass
+    try:
+        conn.execute("PRAGMA busy_timeout=25000;")
+        conn.execute("PRAGMA foreign_keys=ON;")
+    except Exception:
+        pass
     return conn
 
 def safe_backup_to_file(dest_path):

@@ -214,12 +214,15 @@ def save_pfp_upload(file_storage, user_id):
     if ext not in ALLOWED_PFP_EXTENSIONS:
         return None
     
-    upload_dir = os.path.join(app.root_path, "static", "uploads", "pfp")
-    os.makedirs(upload_dir, exist_ok=True)
-    filename = f"pfp_{user_id}_{int(datetime.now().timestamp())}.{ext}"
-    dest_path = os.path.join(upload_dir, filename)
-    file_storage.save(dest_path)
-    return f"uploads/pfp/{filename}"
+    try:
+        upload_dir = os.path.join(app.root_path, "static", "uploads", "pfp")
+        os.makedirs(upload_dir, exist_ok=True)
+        filename = f"pfp_{user_id}_{int(datetime.now().timestamp())}.{ext}"
+        dest_path = os.path.join(upload_dir, filename)
+        file_storage.save(dest_path)
+        return f"uploads/pfp/{filename}"
+    except Exception:
+        return None
 
 @app.context_processor
 def inject_globals():

@@ -2,7 +2,8 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-3.x-black.svg?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
-[![Database](https://img.shields.io/badge/SQLite-WAL%20High--Concurrency-003B57.svg?logo=sqlite&logoColor=white)](https://sqlite.org/)
+[![Vercel Ready](https://img.shields.io/badge/Vercel-Serverless%20Ready-black.svg?logo=vercel&logoColor=white)](https://vercel.com/)
+[![Render Ready](https://img.shields.io/badge/Render-Free%20Hosting-46E3B7.svg?logo=render&logoColor=white)](https://render.com/)
 [![Tests](https://img.shields.io/badge/Tests-24%2F24%20Passing%20(100%25)-success.svg)](#-test-suite)
 [![License](https://img.shields.io/badge/License-Proprietary-orange.svg)](#)
 
@@ -25,6 +26,7 @@ An enterprise-grade, sober, and elegant operations platform designed specificall
   * Tracks ONU Serials, Fiber Distribution Boxes (FDB), Pole numbers, CNIC records, and Drop Fiber Cores (Blue, Orange, Green, Brown) with visual color badges.
 * **🛡️ Security & Enterprise Concurrency**:
   * SQLite configured with **Write-Ahead Logging (WAL)** and 25s busy timeout for high-concurrency environments.
+  * Auto-detects serverless platforms (Vercel) and handles storage gracefully in `/tmp`.
   * PBKDF2/scrypt cryptographic password hashing with automatic legacy upgrade.
   * `HttpOnly` and `SameSite=Lax` session cookie protection.
   * Safe live binary database backups via SQLite Backup API.
@@ -41,16 +43,43 @@ An enterprise-grade, sober, and elegant operations platform designed specificall
 
 ---
 
+## ☁️ 100% Free Cloud Deployment Guide
+
+You can deploy Sabro Networks for **free** with a **free SSL domain** without needing a credit card.
+
+### Option A: Deploy on Vercel (Fastest & 100% Free Domain)
+1. Push your repository to **GitHub** using `UPLOAD_TO_GITHUB.bat`.
+2. Go to **[vercel.com](https://vercel.com/)** and sign in with your GitHub account.
+3. Click **"Add New..."** &rarr; **"Project"**.
+4. Select your `sabro-networks` repository and click **"Import"**.
+5. Keep default settings (Vercel automatically detects `vercel.json` and `api/index.py`).
+6. Click **"Deploy"**.
+7. In ~30 seconds, your site will be live on a free domain like: `https://sabro-networks.vercel.app`.
+
+### Option B: Deploy on Render (Recommended for Long-Running ISP Services)
+1. Push your repository to **GitHub**.
+2. Go to **[render.com](https://render.com/)** and sign in with GitHub.
+3. Click **"New +"** &rarr; **"Web Service"**.
+4. Select your repository.
+5. Render automatically reads `render.yaml` or you can select:
+   * **Environment**: `Python`
+   * **Build Command**: `pip install -r requirements.txt`
+   * **Start Command**: `gunicorn wsgi:app`
+6. Choose the **Free** tier and click **"Create Web Service"**.
+7. Your portal will be live on a free SSL domain like: `https://sabro-networks.onrender.com`.
+
+---
+
 ## 💻 Tech Stack
 
 * **Backend**: Python 3.10+, Flask 3.x
 * **Database**: SQLite 3 with WAL Journaling (`PRAGMA journal_mode=WAL;`)
 * **Frontend**: Bootstrap 5.3, Bootstrap Icons, Plus Jakarta Sans & JetBrains Mono typography, Chart.js
-* **Server Engines**: Gunicorn (Linux/Cloud), Waitress (Windows/Production), Flask WSGI (Development)
+* **Server Engines**: Vercel Serverless (Cloud), Gunicorn (Linux/Render), Waitress (Windows/Production), Flask WSGI (Development)
 
 ---
 
-## ⚡ Quick Start
+## ⚡ Local Setup
 
 ### 1. Clone the Repository
 ```bash
@@ -92,7 +121,7 @@ waitress-serve --listen=0.0.0.0:5000 app:app
 gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ```
 
-Open your browser at **`http://127.0.0.1:5000`** and log in with any of the accounts listed above.
+Open your browser at **`http://127.0.0.1:5000`** and log in with any of the demo accounts listed above.
 
 ---
 
@@ -117,6 +146,8 @@ python -m unittest test_security_suite.py test_enterprise_suite.py test_company_
 ## 📁 Project Structure
 
 ```text
+├── api/
+│   └── index.py               # Vercel serverless function entrypoint
 ├── app.py                     # Main Flask application & route controllers
 ├── db.py                      # Database schema, migrations, connection pool & seeds
 ├── init_db.py                 # CLI database initializer & seeder
@@ -136,6 +167,9 @@ python -m unittest test_security_suite.py test_enterprise_suite.py test_company_
 ├── static/                    # Static assets
 │   ├── img/                   # Logos, default SVG avatars, favicon
 │   └── uploads/pfp/           # User profile picture upload destination
+├── vercel.json                # Vercel deployment & routing configuration
+├── render.yaml                # Render cloud deployment configuration
+├── Procfile                   # Cloud web service process definition
 ├── requirements.txt           # Python package dependencies
 ├── .env.example               # Environment variables template
 ├── .gitignore                 # Production Git ignore rules
