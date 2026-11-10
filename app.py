@@ -13,7 +13,15 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import db
 import dealer_client
 
-app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+app = Flask(
+    __name__,
+    template_folder=TEMPLATES_DIR,
+    static_folder=STATIC_DIR
+)
 # Cryptographically secure session key & cookie policies
 SECRET_KEY = os.environ.get("SECRET_KEY")
 if not SECRET_KEY:
@@ -2526,11 +2534,17 @@ def dealer_sync_test_connection():
 # ================= ERROR HANDLERS =================
 @app.errorhandler(404)
 def page_not_found(e):
-    return render_template("404.html"), 404
+    try:
+        return render_template("404.html"), 404
+    except Exception:
+        return "<h1>404 - Page Not Found</h1><p>Sabro Networks NOC Portal</p>", 404
 
 @app.errorhandler(500)
 def internal_server_error(e):
-    return render_template("500.html"), 500
+    try:
+        return render_template("500.html"), 500
+    except Exception:
+        return f"<h1>500 - Internal Server Error</h1><p>{str(e)}</p>", 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
