@@ -10,10 +10,6 @@ else:
     DB_PATH = os.environ.get("SABRO_DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "sabro_isp.db"))
 
 def get_db():
-    # Auto-initialize database on boot if file is missing (e.g. freshly cloned repo)
-    if not os.path.exists(DB_PATH):
-        init_db(force_reset=False)
-
     conn = sqlite3.connect(DB_PATH, timeout=25.0)
     conn.row_factory = sqlite3.Row
     # Enable WAL mode if supported, fallback to DELETE mode on restricted serverless filesystems
