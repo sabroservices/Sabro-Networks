@@ -4,27 +4,53 @@ import time
 import db
 import app as my_app
 
+import shutil
+import tempfile
+
 class TestCompanySystemSuite(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls._orig_db_path = db.DB_PATH
+        cls._tmp_dir = tempfile.mkdtemp(prefix="sabro_comp_test_")
+        db.DB_PATH = os.path.join(cls._tmp_dir, "company_test.db")
+        db.init_db(force_reset=True)
+
         my_app.app.config["TESTING"] = True
         my_app.app.config["WTF_CSRF_ENABLED"] = False
         cls.client = my_app.app.test_client()
 
         conn = db.get_db()
-        admin = conn.execute("SELECT username, password FROM users WHERE role = 'Admin' LIMIT 1").fetchone()
-        rec = conn.execute("SELECT username, password FROM users WHERE role = 'Recovery Boy' LIMIT 1").fetchone()
-        tech = conn.execute("SELECT username, password FROM users WHERE role = 'Complaint Boy' LIMIT 1").fetchone()
+        conn.execute("INSERT INTO tariffs (name, speed_mb, price) VALUES ('15 MB', 15, 1200)")
+        conn.execute("""
+            INSERT INTO users (full_name, username, password, role, phone, assigned_area, status, total_collected, created_at)
+            VALUES ('Comp Tech', 'comp.tech', 'techpw1', 'Complaint Boy', '0301-9988776', 'Sector A', 'Active', 0, date('now'))
+        """)
+        conn.execute("""
+            INSERT INTO users (full_name, username, password, role, phone, assigned_area, status, total_collected, created_at)
+            VALUES ('Comp Rec', 'comp.rec', 'recpw1', 'Recovery Boy', '0321-9988776', 'Sector A', 'Active', 0, date('now'))
+        """)
+        conn.execute("""
+            INSERT INTO customers (full_name, pppoe_username, password, phone, address, area, tariff_id, status, expiry_date, created_at)
+            VALUES ('Company Test Sub', 'comp.sub', 'pw1', '0300-2223344', 'Street 1', 'Sector A', 1, 'Active', date('now', '+20 days'), date('now'))
+        """)
+        conn.execute("""
+            INSERT INTO invoices (invoice_number, customer_id, amount, month_period, status, due_date, created_at)
+            VALUES ('INV-COMP-1', 1, 1200, 'November 2026', 'Unpaid', date('now', '+5 days'), date('now'))
+        """)
+        conn.commit()
         conn.close()
 
-        cls.admin_user = admin["username"]
-        cls.admin_pass = "admin123" if admin["username"] == "admin" else admin["password"]
+        cls.admin_user = "ahmedbaloch"
+        cls.admin_pass = "adminadmin1"
+        cls.rec_user = "comp.rec"
+        cls.rec_pass = "recpw1"
+        cls.tech_user = "comp.tech"
+        cls.tech_pass = "techpw1"
 
-        cls.rec_user = rec["username"]
-        cls.rec_pass = rec["password"]
-
-        cls.tech_user = tech["username"]
-        cls.tech_pass = tech["password"]
+    @classmethod
+    def tearDownClass(cls):
+        db.DB_PATH = cls._orig_db_path
+        shutil.rmtree(cls._tmp_dir, ignore_errors=True)
 
     def login(self, username, password):
         return self.client.post("/login", data={

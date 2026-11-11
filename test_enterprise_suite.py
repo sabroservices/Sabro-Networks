@@ -1,30 +1,81 @@
 import io
+import os
+import shutil
+import tempfile
 import unittest
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta
 import db
 import app as flask_app
 
 class SabroNetworksEnterpriseTestSuite(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._orig_db_path = db.DB_PATH
+        cls._tmp_dir = tempfile.mkdtemp(prefix="sabro_ent_test_")
+        db.DB_PATH = os.path.join(cls._tmp_dir, "ent_test.db")
+        db.init_db(force_reset=True)
+        cls._created_pfps = []
+
+        conn = db.get_db()
+        now = datetime.now()
+        # Seed isolated test fixtures (kept completely outside production DB)
+        conn.execute("INSERT INTO tariffs (name, speed_mb, price, description) VALUES ('5 MB FTTH', 5, 1000, 'Basic')")
+        conn.execute("INSERT INTO tariffs (name, speed_mb, price, description) VALUES ('15 MB FTTH', 15, 1200, 'Standard')")
+        conn.execute("""
+            INSERT INTO users (full_name, username, password, role, phone, assigned_area, status, total_collected, created_at)
+            VALUES ('Test Fiber Tech', 'test.tech', 'techpass1', 'Complaint Boy', '0301-1112233', 'Sector A', 'Active', 0.0, date('now'))
+        """)
+        conn.execute("""
+            INSERT INTO users (full_name, username, password, role, phone, assigned_area, status, total_collected, created_at)
+            VALUES ('Test Recovery Boy', 'test.rec', 'recpass1', 'Recovery Boy', '0321-1112233', 'Sector A', 'Active', 0.0, date('now'))
+        """)
+        conn.execute("""
+            INSERT INTO customers (full_name, pppoe_username, password, phone, address, area, tariff_id, status, expiry_date, onu_serial, db_box, fiber_core, created_at)
+            VALUES ('Sample Subscriber', 'sub.one', 'subpw1', '0300-5556677', 'House 10', 'Sector A', 2, 'Active', ?, 'HWTC-112233', 'FDB-01, Pole #2', 'Core 1 (Blue)', date('now'))
+        """, ((now + timedelta(days=20)).strftime('%Y-%m-%d'),))
+        tech_id = conn.execute("SELECT id FROM users WHERE username = 'test.tech'").fetchone()[0]
+        rec_id = conn.execute("SELECT id FROM users WHERE username = 'test.rec'").fetchone()[0]
+        admin_id = conn.execute("SELECT id FROM users WHERE username = 'ahmedbaloch'").fetchone()[0]
+        conn.execute("""
+            INSERT INTO invoices (invoice_number, customer_id, amount, month_period, status, due_date, created_at)
+            VALUES ('INV-ENT-001', 1, 1200, 'November 2026', 'Unpaid', ?, date('now'))
+        """, ((now + timedelta(days=5)).strftime('%Y-%m-%d'),))
+        conn.execute("""
+            INSERT INTO tickets (ticket_number, customer_id, subject, details, priority, status, assigned_user_id, created_at)
+            VALUES ('TCK-ENT-001', 1, 'Red LOS Light on ONU', 'Drop line check', 'High', 'Open', ?, datetime('now'))
+        """, (tech_id,))
+        conn.commit()
+        conn.close()
+
+        cls.admin_id = admin_id
+        cls.admin_user = "ahmedbaloch"
+        cls.admin_pass = "adminadmin1"
+        cls.admin_name = "Ahmed Baloch"
+        cls.tech_id = tech_id
+        cls.tech_user = "test.tech"
+        cls.tech_pass = "techpass1"
+        cls.rec_id = rec_id
+        cls.rec_user = "test.rec"
+        cls.rec_pass = "recpass1"
+
+    @classmethod
+    def tearDownClass(cls):
+        # Clean up any temp PFPs uploaded during test_13
+        for rel in cls._created_pfps:
+            p = os.path.join(flask_app.app.root_path, "static", rel.replace("/", os.sep))
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+        db.DB_PATH = cls._orig_db_path
+        shutil.rmtree(cls._tmp_dir, ignore_errors=True)
+
     def setUp(self):
         flask_app.app.config['TESTING'] = True
         flask_app.app.config['WTF_CSRF_ENABLED'] = False
         self.client = flask_app.app.test_client()
-        conn = db.get_db()
-        admin = conn.execute("SELECT id, username, password, full_name FROM users WHERE role = 'Admin' LIMIT 1").fetchone()
-        tech = conn.execute("SELECT id, username, password, full_name FROM users WHERE role = 'Complaint Boy' LIMIT 1").fetchone()
-        rec = conn.execute("SELECT id, username, password, full_name FROM users WHERE role = 'Recovery Boy' LIMIT 1").fetchone()
-        conn.close()
-        self.admin_id = admin["id"]
-        self.admin_user = admin["username"]
-        self.admin_pass = admin["password"]
-        self.admin_name = admin["full_name"]
-        self.tech_id = tech["id"]
-        self.tech_user = tech["username"]
-        self.tech_pass = tech["password"]
-        self.rec_id = rec["id"]
-        self.rec_user = rec["username"]
-        self.rec_pass = rec["password"]
 
     def test_01_public_invoice_access(self):
         """Customers opening WhatsApp bill links must view digital invoice without logging in (person name, package, total amount)."""
@@ -60,10 +111,7 @@ class SabroNetworksEnterpriseTestSuite(unittest.TestCase):
         self.client.get("/logout")
 
         # 2. Complaint Boy Login
-        conn = db.get_db()
-        tech = conn.execute("SELECT username, password FROM users WHERE role = 'Complaint Boy' LIMIT 1").fetchone()
-        conn.close()
-        res_tech = self.client.post("/login", data={"username": tech["username"], "password": tech["password"]}, follow_redirects=True)
+        res_tech = self.client.post("/login", data={"username": self.tech_user, "password": self.tech_pass}, follow_redirects=True)
         self.assertEqual(res_tech.status_code, 200)
         self.assertIn("Technician Desk", res_tech.get_data(as_text=True))
 
@@ -422,6 +470,7 @@ class SabroNetworksEnterpriseTestSuite(unittest.TestCase):
         admin_row = conn.execute("SELECT pfp_image FROM users WHERE id = ?", (self.admin_id,)).fetchone()
         conn.close()
         self.assertTrue(admin_row["pfp_image"].startswith("uploads/pfp/"))
+        self.__class__._created_pfps.append(admin_row["pfp_image"])
         self.client.get("/logout")
 
         # 2. Complaint Boy PFP upload
@@ -434,6 +483,7 @@ class SabroNetworksEnterpriseTestSuite(unittest.TestCase):
         tech_row = conn.execute("SELECT pfp_image FROM users WHERE id = ?", (self.tech_id,)).fetchone()
         conn.close()
         self.assertTrue(tech_row["pfp_image"].startswith("uploads/pfp/"))
+        self.__class__._created_pfps.append(tech_row["pfp_image"])
         self.client.get("/logout")
 
         # 3. Recovery Boy PFP upload
@@ -446,6 +496,7 @@ class SabroNetworksEnterpriseTestSuite(unittest.TestCase):
         rec_row = conn.execute("SELECT pfp_image FROM users WHERE id = ?", (self.rec_id,)).fetchone()
         conn.close()
         self.assertTrue(rec_row["pfp_image"].startswith("uploads/pfp/"))
+        self.__class__._created_pfps.append(rec_row["pfp_image"])
         self.client.get("/logout")
         print("  [PASS] 13 - Profile Picture (PFP) uploads validated across Admin, Complaint Boy, and Recovery Boy.")
 

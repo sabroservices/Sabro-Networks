@@ -10,7 +10,7 @@
 
 **A high-performance operations, ticketing, and billing recovery platform designed specifically for FTTH (Fiber-To-The-Home) Internet Service Providers.**
 
-[Key Features](#-key-features) &bull; [Architecture](#-system-architecture) &bull; [Demo Logins](#-demo-credentials) &bull; [Deploy to Render](#-deploy-to-render) &bull; [Local Setup](#-local-development)
+[Key Features](#-key-features) &bull; [Architecture](#-system-architecture) &bull; [Access Control](#-access-control) &bull; [Deploy to Render](#-deploy-to-render) &bull; [Local Setup](#-local-development)
 
 </div>
 
@@ -54,13 +54,9 @@ flowchart TD
 
 ---
 
-## 👥 Demo Credentials
+## 🔐 Access Control
 
-| Role | Username | Password | Operational Access |
-| :--- | :--- | :--- | :--- |
-| **Admin (Owner)** | `admin` | `admin123` | Full NOC desk, complaints queue, capacity roster, financial records, backups |
-| **Technician (Complaint Boy)** | `rashid.tech` | `tech123` | Assigned fiber fault work orders, fiber lookup, ticket resolution & XP |
-| **Recovery Boy** | `tariq.rec` | `rec123` | Unpaid dues recovery, cash receipt logging, Roman Urdu WhatsApp reminders |
+On initial initialization, the system provisions **zero dummy data** and **a single unrestricted Main Admin account** (`ahmedbaloch`). Additional role-isolated staff logins (Field Technicians and Recovery Staff) can be created anytime under **Staff & User Logins**.
 
 ---
 
@@ -97,7 +93,7 @@ source venv/bin/activate  # On Linux / macOS
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Initialize database schema and default seed data
+# 4. Initialize clean database schema & single Main Admin
 python init_db.py
 
 # 5. Launch the application

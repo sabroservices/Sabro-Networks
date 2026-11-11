@@ -222,8 +222,12 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8" class="text-center py-4 text-muted">
-                        No support complaint tickets found.
+                    <td colspan="8" class="p-0">
+                        <div class="empty-state-box">
+                            <div class="empty-state-icon"><i class="bi bi-headset"></i></div>
+                            <h6 class="fw-bold text-dark mb-1">No Complaint Tickets Yet</h6>
+                            <p class="text-muted small mb-0">All subscriber optical lines are clear. Log new fiber outages or support requests anytime.</p>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -240,8 +244,8 @@
                                 <div class="modal-content">
                                     <form action="{{ url_for('edit_ticket', id=t.id) }}" method="POST">
                                         <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
-                                            <h5 class="modal-title fw-bold" class="text-dark">
-                                                <i class="bi bi-pencil-square me-2" style="color: #ea580c;"></i> Edit Ticket {{ t.ticket_number }}
+                                            <h5 class="modal-title fw-bold text-dark">
+                                                <i class="bi bi-pencil-square me-2" style="color: #2563eb;"></i> Edit Ticket {{ t.ticket_number }}
                                             </h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                         </div>
@@ -315,8 +319,8 @@
         <div class="modal-content">
             <form action="{{ url_for('add_ticket') }}" method="POST">
                 <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
-                    <h5 class="modal-title fw-bold" class="text-dark">
-                        <i class="bi bi-headset me-2" style="color: #ea580c;"></i> Register Support Complaint
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi bi-headset me-2" style="color: #2563eb;"></i> Register Support Complaint
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>

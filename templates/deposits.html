@@ -107,7 +107,13 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8" class="text-center py-4 text-muted">No deposit records found.</td>
+                    <td colspan="8" class="p-0">
+                        <div class="empty-state-box">
+                            <div class="empty-state-icon"><i class="bi bi-shield-lock"></i></div>
+                            <h6 class="fw-bold text-dark mb-1">No Security Deposits Recorded</h6>
+                            <p class="text-muted small mb-0">Refundable ONU device security deposits and installation advances will appear here.</p>
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -123,8 +129,8 @@
                                 <div class="modal-content">
                                     <form action="{{ url_for('edit_deposit', id=d.id) }}" method="POST">
                                         <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
-                                            <h5 class="modal-title fw-bold" class="text-dark">
-                                                <i class="bi bi-pencil-square me-2" style="color: #ea580c;"></i> Edit Deposit: {{ d.full_name }}
+                                            <h5 class="modal-title fw-bold text-dark">
+                                                <i class="bi bi-pencil-square me-2" style="color: #2563eb;"></i> Edit Deposit: {{ d.full_name }}
                                             </h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                         </div>
@@ -185,8 +191,8 @@
         <div class="modal-content">
             <form action="{{ url_for('deposits_page') }}" method="POST">
                 <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
-                    <h5 class="modal-title fw-bold" class="text-dark">
-                        <i class="bi bi-shield-plus me-2" style="color: #ea580c;"></i> Record Device / Security Deposit
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi bi-shield-plus me-2" style="color: #2563eb;"></i> Record Device / Security Deposit
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>

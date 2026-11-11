@@ -5,7 +5,7 @@
 {% block content %}
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3 mb-4">
     <div>
-        <h4 class="fw-bold mb-1" class="text-dark">{{ settings.get('isp_name', 'Sabro Networks') }} (FTTH)</h4>
+        <h4 class="fw-bold mb-1 text-dark">{{ settings.get('isp_name', 'Sabro Networks') }} (FTTH)</h4>
         <p class="text-muted mb-0">Manage broadband fiber internet packages, edit package names, adjust monthly subscription prices, or add new packages.</p>
     </div>
     <button class="btn btn-orange shadow-sm flex-grow-1 flex-md-grow-0" data-bs-toggle="modal" data-bs-target="#addPackageModal">
@@ -17,7 +17,7 @@
 <div class="row g-4">
     {% for t in tariffs %}
     <div class="col-md-6 col-xl-3">
-        <div class="stat-card h-100 d-flex flex-column justify-content-between position-relative" style="border-top: 5px solid #ea580c;">
+        <div class="stat-card h-100 d-flex flex-column justify-content-between position-relative" style="border-top: 4px solid #2563eb;">
             <div>
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span class="badge badge-orange fs-6">{{ t.speed_mb }} MB</span>
@@ -41,7 +41,7 @@
             <div class="pt-3 border-top">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <div>
-                        <span class="fs-4 fw-bold" style="color: #ea580c;">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(t.price) }}</span>
+                        <span class="fs-4 fw-bold" style="color: #2563eb;">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(t.price or 0) }}</span>
                         <span class="text-muted small">/month</span>
                     </div>
                     <span class="badge badge-paid"><i class="bi bi-check-circle me-1"></i> Active</span>
@@ -63,6 +63,19 @@
             </div>
         </div>
     </div>
+{% else %}
+    <div class="col-12">
+        <div class="table-card">
+            <div class="empty-state-box">
+                <div class="empty-state-icon"><i class="bi bi-hdd-network"></i></div>
+                <h5 class="fw-bold text-dark mb-1">No FTTH Speed Packages Yet</h5>
+                <p class="text-muted small mb-3">Define your fiber internet bandwidth tiers and monthly pricing to assign them to subscribers.</p>
+                <button type="button" class="btn btn-orange px-4" data-bs-toggle="modal" data-bs-target="#addPackageModal">
+                    <i class="bi bi-plus-circle me-1"></i> Create First FTTH Package
+                </button>
+            </div>
+        </div>
+    </div>
 {% endfor %}
 </div>
 
@@ -76,8 +89,8 @@
             <div class="modal-content">
                 <form action="{{ url_for('edit_tariff', id=t.id) }}" method="POST">
                     <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
-                        <h5 class="modal-title fw-bold" class="text-dark">
-                            <i class="bi bi-pencil-square me-2" style="color: #ea580c;"></i> Edit Package: {{ t.name }}
+                        <h5 class="modal-title fw-bold text-dark">
+                            <i class="bi bi-pencil-square me-2" style="color: #2563eb;"></i> Edit Package: {{ t.name }}
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
@@ -117,8 +130,8 @@
         <div class="modal-content">
             <form action="{{ url_for('add_tariff') }}" method="POST">
                 <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
-                    <h5 class="modal-title fw-bold" class="text-dark">
-                        <i class="bi bi-plus-circle me-2" style="color: #ea580c;"></i> Create New FTTH Package
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi bi-plus-circle me-2" style="color: #2563eb;"></i> Create New FTTH Package
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>

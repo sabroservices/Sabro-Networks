@@ -1,15 +1,12 @@
 @echo off
-title Sabro Networks Powered By Connect - FTTH Billing System
-color 6f
+title Sabro Networks - FTTH Operations & Billing System
+color 1f
 echo ===============================================================
-echo     Sabro Networks Powered By Connect (FTTH)
-echo     Enterprise Billing, Recovery, Ticketing & Staff Logins
+echo     Sabro Networks (FTTH)
+echo     Enterprise Billing, Recovery, Ticketing & NOC Portal
 echo ===============================================================
 echo.
-echo Default Login Credentials:
-echo   - Admin:         Username: admin       Password: admin123
-echo   - Complain Boy:  Username: rashid.tech Password: tech123
-echo   - Recovery Boy:  Username: shahzaib    Password: rec123
+echo Authenticated Admin Login Enabled (Username: ahmedbaloch)
 echo.
 echo Starting local web server on http://localhost:5000 ...
 echo Press Ctrl+C in this window anytime to stop the server.

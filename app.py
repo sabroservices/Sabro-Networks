@@ -45,19 +45,29 @@ def get_settings():
     settings_dict.setdefault("agency_name", "Vshatkay Solutions")
     settings_dict.setdefault("agency_tagline", "Software Engineering & Telecom Solutions Agency")
     settings_dict.setdefault("agency_url", "https://vshatkaysolutions.com")
-    settings_dict.setdefault("tagline", "FTTH High-Speed Fiber Internet")
     settings_dict.setdefault("currency", "PKR")
-    settings_dict.setdefault("phone", "0300-1234567")
-    settings_dict.setdefault("business_whatsapp", "923001234567")
-    settings_dict.setdefault("email", "info@sabronetworks.com")
-    settings_dict.setdefault("address", "Main Fiber Exchange Hub, Pakistan")
-    settings_dict.setdefault("jazzcash_no", "0300-1234567 (Sabro Networks)")
-    settings_dict.setdefault("easypaisa_no", "0300-1234567 (Sabro Networks)")
-    settings_dict.setdefault("bank_info", "Meezan Bank - A/C: 0101-1234567890 (Sabro Networks)")
+    settings_dict.setdefault("phone", "")
+    settings_dict.setdefault("business_whatsapp", "")
+    settings_dict.setdefault("email", "")
+    settings_dict.setdefault("address", "")
+    settings_dict.setdefault("jazzcash_no", "")
+    settings_dict.setdefault("easypaisa_no", "")
+    settings_dict.setdefault("bank_info", "")
     return settings_dict
 
+def resolve_tariff_id(conn, raw_tariff_id):
+    """Returns a valid tariff ID from DB or None when packages are empty or unselected."""
+    if not raw_tariff_id:
+        return None
+    try:
+        tid = int(raw_tariff_id)
+    except (ValueError, TypeError):
+        return None
+    row = conn.execute("SELECT id FROM tariffs WHERE id = ?", (tid,)).fetchone()
+    return row["id"] if row else None
+
 def clean_whatsapp_phone(phone_str):
-    """Formats 0300-1234567, 0092300..., +92300..., +92 0300... to 923001234567 for WhatsApp API."""
+    """Formats local Pakistani / international phone numbers to digits-only 923xxxxxxxxx for WhatsApp API."""
     if not phone_str:
         return ""
     digits = re.sub(r'\D', '', str(phone_str))
@@ -71,6 +81,8 @@ def clean_whatsapp_phone(phone_str):
         digits = '92' + digits[1:]
     elif len(digits) == 10 and digits.startswith('3'):
         digits = '92' + digits
+    if digits.startswith('920') and len(digits) == 13:
+        digits = '92' + digits[3:]
     return digits
 
 def generate_unique_invoice_number(conn, customer_id, suffix=""):
@@ -93,17 +105,6 @@ def generate_unique_ticket_number(conn):
         count += 1
         candidate = f"TCK-{year}-{count:03d}"
     return candidate
-
-    digits = re.sub(r"\D", "", str(phone_str))
-    if digits.startswith("0092"):
-        digits = digits[2:]
-    elif digits.startswith("0"):
-        digits = "92" + digits[1:]
-    elif digits.startswith("3") and len(digits) == 10:
-        digits = "92" + digits
-    if digits.startswith("920") and len(digits) == 13:
-        digits = "92" + digits[3:]
-    return digits
 
 ALLOWED_PFP_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
 
@@ -598,9 +599,14 @@ def dashboard():
 
         recent_tickets = all_active_complaints[:6]
 
-        all_technicians = conn.execute("""
-            SELECT id, full_name, phone, role FROM users WHERE status = 'Active' AND role IN ('Complaint Boy', 'Staff', 'Admin') ORDER BY full_name ASC
+        tech_rows = conn.execute("""
+            SELECT id, full_name, phone, role, assigned_area, pfp_image FROM users WHERE status = 'Active' AND role IN ('Complaint Boy', 'Staff', 'Admin') ORDER BY full_name ASC
         """).fetchall()
+        all_technicians = []
+        for tr in tech_rows:
+            td = dict(tr)
+            td["avatar_url"] = get_user_avatar(td)
+            all_technicians.append(td)
 
         all_active_cust_list = conn.execute("""
             SELECT id, full_name, pppoe_username, phone, area, db_box, fiber_core FROM customers WHERE status = 'Active' ORDER BY full_name ASC
@@ -690,17 +696,14 @@ def add_customer():
     phone = (request.form.get("phone") or "").strip()
     address = (request.form.get("address") or "").strip()
     area = (request.form.get("area") or "").strip()
-    try:
-        tariff_id = int(request.form.get("tariff_id") or 1)
-    except (ValueError, TypeError):
-        tariff_id = 1
+    raw_tariff_id = request.form.get("tariff_id")
     try:
         days = int(request.form.get("days", 30) or 30)
     except (ValueError, TypeError):
         days = 30
     initial_payment = request.form.get("initial_payment", "Unpaid")
     try:
-        onu_deposit = float(request.form.get("onu_deposit", 0) or 0)
+        onu_deposit = max(0.0, float(request.form.get("onu_deposit", 0) or 0))
     except (ValueError, TypeError):
         onu_deposit = 0.0
 
@@ -708,19 +711,19 @@ def add_customer():
         flash("Customer name, PPPoE username, and password are required.", "danger")
         return redirect(url_for("customers_list"))
     
-    # FTTH Carrier Details
-    onu_prefix = (pppoe_username[:4].upper() if pppoe_username else "FTTH")
-    onu_serial = request.form.get("onu_serial", "").strip() or f"HWTC-{onu_prefix}2026"
-    db_box = request.form.get("db_box", "").strip() or "FDB-01, Main Pole"
-    fiber_core = request.form.get("fiber_core", "").strip() or "Core 1 (Blue)"
-    cnic = request.form.get("cnic", "").strip() or "42101-0000000-0"
-    installation_date = request.form.get("installation_date", "").strip() or datetime.now().strftime("%Y-%m-%d")
+    # FTTH Carrier Details (stored clean without synthetic placeholders)
+    onu_serial = (request.form.get("onu_serial") or "").strip()
+    db_box = (request.form.get("db_box") or "").strip()
+    fiber_core = (request.form.get("fiber_core") or "").strip() or "Core 1 (Blue)"
+    cnic = (request.form.get("cnic") or "").strip()
+    installation_date = (request.form.get("installation_date") or "").strip() or datetime.now().strftime("%Y-%m-%d")
 
     expiry_date = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
     created_at = datetime.now().strftime("%Y-%m-%d")
 
     conn = db.get_db()
     try:
+        tariff_id = resolve_tariff_id(conn, raw_tariff_id)
         conn.execute("""
             INSERT INTO customers (full_name, pppoe_username, password, phone, address, area, tariff_id, status, expiry_date, 
                                    onu_serial, db_box, fiber_core, cnic, installation_date, created_at)
@@ -729,7 +732,7 @@ def add_customer():
               onu_serial, db_box, fiber_core, cnic, installation_date, created_at))
         cust_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
-        tariff = conn.execute("SELECT * FROM tariffs WHERE id = ?", (tariff_id,)).fetchone()
+        tariff = conn.execute("SELECT * FROM tariffs WHERE id = ?", (tariff_id,)).fetchone() if tariff_id else None
         if tariff:
             inv_number = generate_unique_invoice_number(conn, cust_id)
             is_paid = (initial_payment == "Paid")
@@ -764,10 +767,7 @@ def edit_customer(id):
     phone = (request.form.get("phone") or "").strip()
     address = (request.form.get("address") or "").strip()
     area = (request.form.get("area") or "").strip()
-    try:
-        tariff_id = int(request.form.get("tariff_id", 1) or 1)
-    except (ValueError, TypeError):
-        tariff_id = 1
+    raw_tariff_id = request.form.get("tariff_id")
     status = request.form.get("status", "Active")
     expiry_date = request.form.get("expiry_date")
     
@@ -779,6 +779,7 @@ def edit_customer(id):
     installation_date = (request.form.get("installation_date") or "").strip()
 
     conn = db.get_db()
+    tariff_id = resolve_tariff_id(conn, raw_tariff_id)
     cust = conn.execute("SELECT id FROM customers WHERE id = ?", (id,)).fetchone()
     if not cust:
         conn.close()
@@ -1159,32 +1160,41 @@ def whatsapp_invoice(id):
     digital_invoice_url = f"{host_url}/invoice/{invoice['id']}/print"
 
     status_label = "✅ PAID (Received)" if invoice["status"] == "Paid" else "⚠️ UNPAID (Due Bill)"
+    plan_title = invoice["plan_name"] or "Standard FTTH Plan"
+    speed_suffix = f" ({invoice['speed_mb']} Mbps)" if invoice["speed_mb"] else ""
+    inv_amt = invoice["amount"] or 0
+    payment_lines = []
+    if settings.get('jazzcash_no'):
+        payment_lines.append(f"• JazzCash: {settings.get('jazzcash_no')}")
+    if settings.get('easypaisa_no'):
+        payment_lines.append(f"• EasyPaisa: {settings.get('easypaisa_no')}")
+    if settings.get('bank_info'):
+        payment_lines.append(f"• Bank Transfer: {settings.get('bank_info')}")
     payment_info = ""
-    if invoice["status"] != "Paid":
+    if invoice["status"] != "Paid" and payment_lines:
         payment_info = (
-            f"💳 *Easy Online Payment Accounts:*\n"
-            f"• JazzCash: {settings.get('jazzcash_no')}\n"
-            f"• EasyPaisa: {settings.get('easypaisa_no')}\n"
-            f"• Bank Transfer: {settings.get('bank_info')}\n"
-            f"Please share transfer slip screenshot on this chat after payment.\n"
-            f"----------------------------------------\n"
+            "💳 *Easy Online Payment Accounts:*\n"
+            + "\n".join(payment_lines) + "\n"
+            "Please share transfer slip screenshot on this chat after payment.\n"
+            "----------------------------------------\n"
         )
+    helpline_line = f"📞 Helpline / Support: {settings.get('phone')}\n" if settings.get('phone') else ""
 
     msg = (
         f"*{settings.get('isp_name', 'Sabro Networks')}*\n"
         f"⚡ *FTTH High-Speed Fiber Internet Bill*\n"
         f"----------------------------------------\n"
         f"👤 Customer Name: *{invoice['full_name']}*\n"
-        f"📦 Internet Package: *{invoice['plan_name']} ({invoice['speed_mb']} Mbps)*\n"
+        f"📦 Internet Package: *{plan_title}{speed_suffix}*\n"
         f"📅 Billing Month: *{invoice['month_period']}*\n"
-        f"💰 Total Amount: *{settings.get('currency', 'PKR')} {invoice['amount']:,.0f}*\n"
+        f"💰 Total Amount: *{settings.get('currency', 'PKR')} {inv_amt:,.0f}*\n"
         f"📌 Status: *{status_label}*\n"
-        f"⏳ Due Date: *{invoice['due_date']}*\n"
+        f"⏳ Due Date: *{invoice['due_date'] or 'Immediate'}*\n"
         f"----------------------------------------\n"
         f"{payment_info}"
         f"📄 View / Print Digital Bill Slip:\n{digital_invoice_url}\n\n"
-        f"📞 Helpline / Support: {settings.get('phone', '0300-1234567')}\n"
-        f"Thank you for choosing Sabro Networks!"
+        f"{helpline_line}"
+        f"Thank you for choosing {settings.get('isp_name', 'Sabro Networks')}!"
     )
 
     encoded_msg = urllib.parse.quote(msg)
@@ -1214,29 +1224,46 @@ def customer_whatsapp_welcome(id):
         flash("Customer has no valid mobile number for WhatsApp.", "warning")
         return redirect(url_for("customers_list"))
 
+    c_plan = cust['plan_name'] or 'Standard FTTH Plan'
+    c_speed = f" ({cust['speed_mb']} Mbps)" if cust['speed_mb'] else ""
+    c_price = cust['plan_price'] or 0
+    pay_acct_lines = []
+    if settings.get('jazzcash_no'):
+        pay_acct_lines.append(f"• JazzCash: {settings.get('jazzcash_no')}")
+    if settings.get('easypaisa_no'):
+        pay_acct_lines.append(f"• EasyPaisa: {settings.get('easypaisa_no')}")
+    if settings.get('bank_info'):
+        pay_acct_lines.append(f"• Bank: {settings.get('bank_info')}")
+    pay_section = (
+        "----------------------------------------\n"
+        "💳 *Online Payment Accounts:*\n" + "\n".join(pay_acct_lines) + "\n"
+    ) if pay_acct_lines else ""
+    support_lines = []
+    if settings.get('phone'):
+        support_lines.append(f"• Helpline: {settings.get('phone')}")
+    if settings.get('address'):
+        support_lines.append(f"• Office Address: {settings.get('address')}")
+    support_section = (
+        "----------------------------------------\n"
+        "📞 *Customer Support:*\n" + "\n".join(support_lines) + "\n\n"
+    ) if support_lines else "\n"
+
     msg = (
         f"🌐 *{settings.get('isp_name', 'Sabro Networks')}*\n"
         f"⚡ *FTTH Optical Fiber Connection Activated!*\n"
         f"----------------------------------------\n"
         f"Assalam-o-Alaikum *{cust['full_name']}*,\n"
-        f"Welcome to the Sabro Networks family! Your high-speed fiber internet connection is now active and ready to use.\n\n"
+        f"Welcome to {settings.get('isp_name', 'Sabro Networks')}! Your high-speed fiber internet connection is now active and ready to use.\n\n"
         f"📋 *Your Connection Credentials:*\n"
         f"• PPPoE Username: *{cust['pppoe_username']}*\n"
         f"• PPPoE Password: *{cust['password']}*\n"
-        f"• Fiber Package: *{cust['plan_name']} ({cust['speed_mb']} Mbps)*\n"
-        f"• Monthly Tariff: *{settings.get('currency', 'PKR')} {cust['plan_price']:,.0f}*\n"
-        f"• Expiry Date: *{cust['expiry_date']}*\n"
+        f"• Fiber Package: *{c_plan}{c_speed}*\n"
+        f"• Monthly Tariff: *{settings.get('currency', 'PKR')} {c_price:,.0f}*\n"
+        f"• Expiry Date: *{cust['expiry_date'] or 'Active'}*\n"
         f"• ONT / ONU Serial: *{cust['onu_serial'] or 'Registered'}*\n"
         f"• Distribution Box: *{cust['db_box'] or 'Assigned'}*\n"
-        f"----------------------------------------\n"
-        f"💳 *Online Payment Accounts (JazzCash / EasyPaisa / Bank):*\n"
-        f"• JazzCash: {settings.get('jazzcash_no')}\n"
-        f"• EasyPaisa: {settings.get('easypaisa_no')}\n"
-        f"• Bank: {settings.get('bank_info')}\n"
-        f"----------------------------------------\n"
-        f"📞 *Customer Support & Helplines:*\n"
-        f"• Helpline: {settings.get('phone', '0300-1234567')}\n"
-        f"• Office Address: {settings.get('address')}\n\n"
+        f"{pay_section}"
+        f"{support_section}"
         f"Enjoy blazing-fast internet streaming & browsing!"
     )
 
@@ -1270,17 +1297,18 @@ def customer_whatsapp_reminder(id):
         flash("Customer has no valid phone number for WhatsApp.", "warning")
         return redirect(url_for("customers_list"))
 
-    amount_due = latest_inv["amount"] if latest_inv else cust["plan_price"]
+    amount_due = (latest_inv["amount"] if latest_inv else cust["plan_price"]) or 0
     isp = settings.get("isp_name", "Sabro Networks")
-    helpline = settings.get("phone", "0300-1234567")
+    helpline = settings.get("phone", "")
+    rabta_line = f"\nRabta: {helpline}" if helpline else ""
 
     msg = (
         f"Assalam-o-Alaikum *{cust['full_name']}* bhai,\n\n"
         f"*{isp}* ki taraf se aapka internet bill *Rs. {amount_due:,.0f}* pending hai. "
         f"Baraye meherbani time pe clear kar dein taake aapka internet chalta rahe.\n\n"
         f"Shukriya!\n"
-        f"*{isp}*\n"
-        f"Rabta: {helpline}"
+        f"*{isp}*"
+        f"{rabta_line}"
     )
 
     encoded_msg = urllib.parse.quote(msg)
@@ -1321,10 +1349,10 @@ def defaulters_whatsapp_summary():
         msg += f"   💰 Rs. {u['amount']:,.0f} (Due: {u['due_date']})\n"
         count += 1
 
+    helpline_def = f"\nHelpline: {settings.get('phone')}" if settings.get('phone') else ""
     msg += (
         f"\n----------------------------------------\n"
-        f"💳 Please deposit collections daily at office counter.\n"
-        f"Helpline: {settings.get('phone', '0300-1234567')}"
+        f"💳 Please deposit collections daily at office counter.{helpline_def}"
     )
 
     encoded = urllib.parse.quote(msg)
@@ -1581,6 +1609,7 @@ def whatsapp_ticket_resolved(id):
 
     resolution_text = ticket["resolution_notes"] or "Optical fiber line checked and internet signal verified."
     tech_name = ticket["tech_name"] or "Field Support Team"
+    helpline_res = f"📞 Helpline: {settings.get('phone')}\n" if settings.get('phone') else ""
 
     msg = (
         f"✅ *COMPLAINT RESOLVED - {settings.get('isp_name', 'Sabro Networks')}*\n"
@@ -1594,8 +1623,8 @@ def whatsapp_ticket_resolved(id):
         f"⏰ *Resolved At:* {ticket['resolved_at'] or datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
         f"----------------------------------------\n"
         f"Please restart your ONU router and check your connection. If you still encounter any difficulty, please reply to this message.\n\n"
-        f"📞 Helpline: {settings.get('phone', '0300-1234567')}\n"
-        f"Thank you for choosing Sabro Networks!"
+        f"{helpline_res}"
+        f"Thank you for choosing {settings.get('isp_name', 'Sabro Networks')}!"
     )
 
     encoded_msg = urllib.parse.quote(msg)
@@ -2318,7 +2347,7 @@ def import_customers():
             tariff_map[f"{t['speed_mb']}mb"] = t["id"]
             tariff_map[f"{t['speed_mb']} mb"] = t["id"]
             tariff_map[f"{t['speed_mb']}"] = t["id"]
-        default_tariff_id = tariffs[0]["id"] if tariffs else 1
+        default_tariff_id = tariffs[0]["id"] if tariffs else None
 
         imported_count = 0
         skipped_count = 0

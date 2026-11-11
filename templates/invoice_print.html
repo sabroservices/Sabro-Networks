@@ -176,10 +176,16 @@
                 <h3 class="fw-bold mb-0 text-dark" style="letter-spacing: 0.5px; font-size: 1.55rem;">{{ settings.get('isp_name', 'Sabro Networks') }}</h3>
             </div>
             <div class="small text-dark mt-1" style="font-weight: 600;">{{ settings.get('tagline', 'High-Speed Optical Fiber Internet (FTTH)') }}</div>
+            {% if settings.get('phone') or settings.get('email') %}
             <div class="small text-dark mt-1">
-                <i class="bi bi-telephone-fill me-1"></i> Helpline: <strong>{{ settings.get('phone', '0300-1234567') }}</strong> &bull; <i class="bi bi-envelope-fill me-1"></i> {{ settings.get('email', 'info@sabronetworks.com') }}
+                {% if settings.get('phone') %}<i class="bi bi-telephone-fill me-1"></i> Helpline: <strong>{{ settings.get('phone') }}</strong>{% endif %}
+                {% if settings.get('phone') and settings.get('email') %} &bull; {% endif %}
+                {% if settings.get('email') %}<i class="bi bi-envelope-fill me-1"></i> {{ settings.get('email') }}{% endif %}
             </div>
-            <div class="small text-muted"><i class="bi bi-geo-alt-fill me-1"></i> {{ settings.get('address', 'Main Fiber Exchange Hub, Pakistan') }}</div>
+            {% endif %}
+            {% if settings.get('address') %}
+            <div class="small text-muted"><i class="bi bi-geo-alt-fill me-1"></i> {{ settings.get('address') }}</div>
+            {% endif %}
         </div>
 
         <!-- Meta Details: Two Columns (Billed Customer & Bill Info) -->
@@ -210,8 +216,8 @@
             <tbody>
                 <tr>
                     <td>
-                        <div class="fw-bold text-dark fs-6">{{ invoice.plan_name }}</div>
-                        <div class="small text-muted">{{ invoice.speed_mb }} Mbps Unlimited High-Speed Fiber Internet</div>
+                        <div class="fw-bold text-dark fs-6">{{ invoice.plan_name or 'Standard FTTH Plan' }}</div>
+                        <div class="small text-muted">{% if invoice.speed_mb %}{{ invoice.speed_mb }} Mbps {% endif %}Unlimited High-Speed Fiber Internet</div>
                     </td>
                     <td class="text-end fw-bold text-dark fs-6">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(invoice.amount) }}</td>
                 </tr>
@@ -231,25 +237,27 @@
         </table>
 
         <!-- Online Payment Instructions (Black & White Box) -->
-        {% if invoice.status != 'Paid' %}
+        {% if invoice.status != 'Paid' and (settings.get('jazzcash_no') or settings.get('easypaisa_no') or settings.get('bank_info')) %}
         <div class="p-2 px-3 mb-3 border border-dark rounded bg-white">
             <div class="fw-bold mb-1 text-dark small">
                 <i class="bi bi-wallet2 me-1"></i> Online Payment Accounts:
             </div>
             <div class="row g-2 small">
-                <div class="col-md-6">
-                    <strong>JazzCash:</strong> {{ settings.get('jazzcash_no', '0300-1234567') }}
-                </div>
-                <div class="col-md-6">
-                    <strong>EasyPaisa:</strong> {{ settings.get('easypaisa_no', '0300-1234567') }}
-                </div>
-                <div class="col-12">
-                    <strong>Bank:</strong> {{ settings.get('bank_info', 'Meezan Bank') }}
-                </div>
+                {% if settings.get('jazzcash_no') %}
+                <div class="col-md-6"><strong>JazzCash:</strong> {{ settings.get('jazzcash_no') }}</div>
+                {% endif %}
+                {% if settings.get('easypaisa_no') %}
+                <div class="col-md-6"><strong>EasyPaisa:</strong> {{ settings.get('easypaisa_no') }}</div>
+                {% endif %}
+                {% if settings.get('bank_info') %}
+                <div class="col-12"><strong>Bank:</strong> {{ settings.get('bank_info') }}</div>
+                {% endif %}
             </div>
+            {% if settings.get('phone') %}
             <div class="small text-muted mt-1" style="font-size: 0.78rem;">
-                * Send transaction receipt on WhatsApp: <strong>{{ settings.get('phone', '0300-1234567') }}</strong> after payment.
+                * Send transaction receipt on WhatsApp: <strong>{{ settings.get('phone') }}</strong> after payment.
             </div>
+            {% endif %}
         </div>
         {% endif %}
 

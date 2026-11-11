@@ -11,7 +11,7 @@
             <div class="table-card p-4 mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="fw-bold mb-0 text-dark">
-                        <i class="bi bi-building me-2" style="color: #ea580c;"></i> ISP Brand & Network Identity
+                        <i class="bi bi-building me-2" style="color: #2563eb;"></i> ISP Brand & Network Identity
                     </h5>
                     <span class="badge badge-orange">General Config</span>
                 </div>
@@ -31,7 +31,7 @@
                 <div class="row g-2 mb-3">
                     <div class="col-md-6">
                         <label class="form-label fw-bold"><i class="bi bi-telephone-fill text-primary me-1"></i> Helpline Phone</label>
-                        <input type="text" name="phone" id="inputPhone" class="form-control" value="{{ settings.get('phone', '0300-1234567') }}" placeholder="0300-1234567">
+                        <input type="text" name="phone" id="inputPhone" class="form-control" value="{{ settings.get('phone', '') }}" placeholder="e.g. 03XX-XXXXXXX">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold"><i class="bi bi-cash-coin text-success me-1"></i> Currency Symbol / Code</label>
@@ -42,11 +42,11 @@
                 <div class="row g-2">
                     <div class="col-md-6">
                         <label class="form-label fw-bold"><i class="bi bi-envelope-fill text-secondary me-1"></i> Official Email</label>
-                        <input type="email" name="email" id="inputEmail" class="form-control" value="{{ settings.get('email', 'info@sabronetworks.com') }}" placeholder="info@sabronetworks.com">
+                        <input type="email" name="email" id="inputEmail" class="form-control" value="{{ settings.get('email', '') }}" placeholder="e.g. info@yourisp.com">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold"><i class="bi bi-geo-alt-fill text-danger me-1"></i> NOC Hub / Main Office Address</label>
-                        <input type="text" name="address" id="inputAddress" class="form-control" value="{{ settings.get('address', 'Main Fiber Exchange Hub, Pakistan') }}" placeholder="NOC Office Address">
+                        <input type="text" name="address" id="inputAddress" class="form-control" value="{{ settings.get('address', '') }}" placeholder="NOC Office Address">
                     </div>
                 </div>
             </div>
@@ -64,7 +64,7 @@
                     <label class="form-label fw-bold">Official Business WhatsApp Number (with Country Code) *</label>
                     <div class="input-group">
                         <span class="input-group-text bg-light text-success fw-bold"><i class="bi bi-whatsapp"></i></span>
-                        <input type="text" name="business_whatsapp" id="inputWhatsapp" class="form-control fw-bold text-success font-monospace" value="{{ settings.get('business_whatsapp', '923001234567') }}" required placeholder="923001234567">
+                        <input type="text" name="business_whatsapp" id="inputWhatsapp" class="form-control fw-bold text-success font-monospace" value="{{ settings.get('business_whatsapp', '') }}" placeholder="e.g. 923XXXXXXXXX">
                     </div>
                     <div class="form-text small text-muted">Format: 923001234567 (No plus, no spaces, no dashes). Used for customer WhatsApp bills & technician dispatch.</div>
                 </div>
@@ -82,21 +82,21 @@
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
                         <label class="form-label fw-bold"><i class="bi bi-phone text-danger me-1"></i> JazzCash Account # & Title</label>
-                        <input type="text" name="jazzcash_no" id="inputJazzcash" class="form-control" value="{{ settings.get('jazzcash_no', '0300-1234567 (Sabro Networks)') }}" placeholder="0300-1234567 (Account Title)">
+                        <input type="text" name="jazzcash_no" id="inputJazzcash" class="form-control" value="{{ settings.get('jazzcash_no', '') }}" placeholder="e.g. 03XX-XXXXXXX (Account Title)">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold"><i class="bi bi-phone text-success me-1"></i> EasyPaisa Account # & Title</label>
-                        <input type="text" name="easypaisa_no" id="inputEasypaisa" class="form-control" value="{{ settings.get('easypaisa_no', '0300-1234567 (Sabro Networks)') }}" placeholder="0300-1234567 (Account Title)">
+                        <input type="text" name="easypaisa_no" id="inputEasypaisa" class="form-control" value="{{ settings.get('easypaisa_no', '') }}" placeholder="e.g. 03XX-XXXXXXX (Account Title)">
                     </div>
                     <div class="col-12">
                         <label class="form-label fw-bold"><i class="bi bi-bank text-primary me-1"></i> Bank Account / IBAN Details</label>
-                        <input type="text" name="bank_info" id="inputBank" class="form-control" value="{{ settings.get('bank_info', 'Meezan Bank - A/C: 0101-1234567890 (Sabro Networks)') }}" placeholder="Bank Name - Account Number (Title)">
+                        <input type="text" name="bank_info" id="inputBank" class="form-control" value="{{ settings.get('bank_info', '') }}" placeholder="Bank Name - Account Number (Title)">
                     </div>
                 </div>
             </div>
 
             <!-- 4. Engineering Agency & Technology Partner (Vshatkay Solutions) -->
-            <div class="table-card p-4 mb-4" style="border: 1.5px solid rgba(234, 88, 12, 0.4);">
+            <div class="table-card p-4 mb-4" style="border: 1.5px solid rgba(37, 99, 235, 0.35);">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="fw-bold mb-0 text-dark">
                         <i class="bi bi-code-slash text-danger me-2"></i> Engineering Agency & Technology Partner
@@ -133,7 +133,7 @@
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <div>
                     <h5 class="fw-bold mb-1 text-dark">
-                        <i class="bi bi-database-fill-down me-2" style="color: #ea580c;"></i> Database Safety & Offline Backup
+                        <i class="bi bi-database-fill-down me-2" style="color: #2563eb;"></i> Database Safety & Offline Backup
                     </h5>
                     <p class="text-muted small mb-0">
                         Download a complete timestamped copy of your SQLite database or restore a verified backup file.
@@ -154,7 +154,7 @@
     <!-- Right Column: Live Direct Result Preview (Instant Real-time Feedback) -->
     <div class="col-xl-5">
         <div style="position: sticky; top: 85px;">
-            <div class="table-card p-4 mb-4" style="background: rgba(255, 255, 255, 0.98); border: 2px solid #ea580c; box-shadow: 0 15px 35px -5px rgba(234, 88, 12, 0.2);">
+            <div class="table-card p-4 mb-4" style="background: rgba(255, 255, 255, 0.98); border: 2px solid #2563eb; box-shadow: 0 15px 35px -5px rgba(234, 88, 12, 0.2);">
                 <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
                     <div>
                         <h6 class="fw-bold text-dark mb-0">
@@ -162,18 +162,18 @@
                         </h6>
                         <div class="small text-muted" style="font-size: 0.72rem;">Updates instantly as you type</div>
                     </div>
-                    <span class="badge bg-success text-white pulse-indicator">Live Active</span>
+                    <span class="badge bg-success text-white d-inline-flex align-items-center gap-1.5"><span class="pulse-indicator" style="background:#fff;width:7px;height:7px;"></span>Live Active</span>
                 </div>
 
                 <!-- 1. Live Brand Header Replica -->
                 <div class="p-3 rounded-3 mb-3 text-center" style="background: linear-gradient(135deg, #0f172a, #1e293b); border: 1px solid rgba(234, 88, 12, 0.35);">
-                    <img src="{{ url_for('static', filename='img/sabro_logo.jpg') }}" alt="Logo" class="rounded-circle shadow mb-2" style="width: 52px; height: 52px; object-fit: cover; border: 2.5px solid #ea580c;">
+                    <img src="{{ url_for('static', filename='img/sabro_logo.jpg') }}" alt="Logo" class="rounded-circle shadow mb-2" style="width: 52px; height: 52px; object-fit: cover; border: 2.5px solid #2563eb;">
                     <h5 class="fw-bold text-white mb-0" id="previewIspName">{{ settings.get('isp_name', 'Sabro Networks') }}</h5>
                     <div class="small fw-semibold mt-1" style="color: #fb923c;" id="previewTagline">{{ settings.get('tagline', 'FTTH High-Speed Fiber Internet') }}</div>
                     <div class="mt-2 text-white-50 small d-flex justify-content-center gap-2" style="font-size: 0.72rem;">
-                        <span><i class="bi bi-telephone text-warning me-1"></i><span id="previewPhone">{{ settings.get('phone', '0300-1234567') }}</span></span>
+                        <span><i class="bi bi-telephone text-warning me-1"></i><span id="previewPhone">{{ settings.get('phone') or 'Not set' }}</span></span>
                         <span>&bull;</span>
-                        <span><i class="bi bi-geo-alt text-danger me-1"></i><span id="previewAddress">{{ settings.get('address', 'Main Fiber Hub') }}</span></span>
+                        <span><i class="bi bi-geo-alt text-danger me-1"></i><span id="previewAddress">{{ settings.get('address') or 'Not set' }}</span></span>
                     </div>
                 </div>
 
@@ -195,21 +195,21 @@
                     <!-- Online Payment Preview -->
                     <div class="p-2 bg-white rounded border small mb-2" style="font-size: 0.75rem;">
                         <div class="fw-bold text-dark mb-1"><i class="bi bi-wallet2 text-success me-1"></i> Payment Accounts (On Bills):</div>
-                        <div class="text-muted"><strong>JazzCash:</strong> <span id="previewJazzcash">{{ settings.get('jazzcash_no', '0300-1234567 (Sabro Networks)') }}</span></div>
-                        <div class="text-muted"><strong>EasyPaisa:</strong> <span id="previewEasypaisa">{{ settings.get('easypaisa_no', '0300-1234567 (Sabro Networks)') }}</span></div>
-                        <div class="text-muted text-truncate"><strong>Bank:</strong> <span id="previewBank">{{ settings.get('bank_info', 'Meezan Bank') }}</span></div>
+                        <div class="text-muted"><strong>JazzCash:</strong> <span id="previewJazzcash">{{ settings.get('jazzcash_no') or 'Not set' }}</span></div>
+                        <div class="text-muted"><strong>EasyPaisa:</strong> <span id="previewEasypaisa">{{ settings.get('easypaisa_no') or 'Not set' }}</span></div>
+                        <div class="text-muted text-truncate"><strong>Bank:</strong> <span id="previewBank">{{ settings.get('bank_info') or 'Not set' }}</span></div>
                     </div>
 
                     <!-- Direct WhatsApp Tester -->
                     <div class="text-center pt-1">
-                        <a href="https://wa.me/{{ clean_whatsapp_phone(settings.get('business_whatsapp', '923001234567')) }}" target="_blank" id="previewWhatsappBtn" class="btn btn-sm btn-success fw-bold w-100 shadow-sm">
-                            <i class="bi bi-whatsapp me-1"></i> Test WhatsApp Link (<span id="previewWhatsappNumber">{{ settings.get('business_whatsapp', '923001234567') }}</span>)
+                        <a href="https://wa.me/{{ clean_whatsapp_phone(settings.get('business_whatsapp') or 'Not set') }}" target="_blank" id="previewWhatsappBtn" class="btn btn-sm btn-success fw-bold w-100 shadow-sm">
+                            <i class="bi bi-whatsapp me-1"></i> Test WhatsApp Link (<span id="previewWhatsappNumber">{{ settings.get('business_whatsapp') or 'Not set' }}</span>)
                         </a>
                     </div>
                 </div>
 
                 <!-- 3. Vshatkay Solutions Agency Attribution Preview -->
-                <div class="p-3 rounded-3" style="background: linear-gradient(135deg, #18181b, #27272a); border: 1.5px solid #ea580c;">
+                <div class="p-3 rounded-3" style="background: linear-gradient(135deg, #18181b, #27272a); border: 1.5px solid #2563eb;">
                     <div class="d-flex align-items-center gap-3">
                         <div class="rounded-2 d-flex align-items-center justify-content-center text-white flex-shrink-0" style="width: 42px; height: 42px; background: linear-gradient(135deg, #ea580c, #f97316); font-weight: 900; font-size: 1.1rem; box-shadow: 0 0 15px rgba(234, 88, 12, 0.5);">
                             VS
@@ -278,12 +278,12 @@
 
     bindInputToPreview('inputIspName', 'previewIspName', 'Sabro Networks');
     bindInputToPreview('inputTagline', 'previewTagline', 'FTTH High-Speed Fiber Internet');
-    bindInputToPreview('inputPhone', 'previewPhone', '0300-1234567');
+    bindInputToPreview('inputPhone', 'previewPhone', 'Not set');
     bindInputToPreview('inputCurrency', 'previewCurrency', 'PKR');
-    bindInputToPreview('inputAddress', 'previewAddress', 'Main Fiber Hub');
-    bindInputToPreview('inputJazzcash', 'previewJazzcash', '0300-1234567 (Sabro Networks)');
-    bindInputToPreview('inputEasypaisa', 'previewEasypaisa', '0300-1234567 (Sabro Networks)');
-    bindInputToPreview('inputBank', 'previewBank', 'Meezan Bank');
+    bindInputToPreview('inputAddress', 'previewAddress', 'Not set');
+    bindInputToPreview('inputJazzcash', 'previewJazzcash', 'Not set');
+    bindInputToPreview('inputEasypaisa', 'previewEasypaisa', 'Not set');
+    bindInputToPreview('inputBank', 'previewBank', 'Not set');
     bindInputToPreview('inputAgencyName', 'previewAgencyName', 'Vshatkay Solutions');
     bindInputToPreview('inputAgencyTagline', 'previewAgencyTagline', 'Software Engineering & Telecom Solutions Agency');
 
@@ -293,7 +293,7 @@
     const waBtn = document.getElementById('previewWhatsappBtn');
     if (waInput && waNumberPreview && waBtn) {
         waInput.addEventListener('input', function() {
-            const num = this.value.trim() || '923001234567';
+            const num = this.value.trim() || 'Not set';
             waNumberPreview.textContent = num;
             const clean = num.replace(/[^0-9]/g, '');
             waBtn.href = 'https://wa.me/' + clean;

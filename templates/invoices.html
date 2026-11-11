@@ -99,7 +99,7 @@
         <div class="stat-card">
             <div class="text-muted small fw-semibold text-uppercase">Collection Rate</div>
             {% set total_b = paid_sum + unpaid_sum %}
-            {% set rate_pct = ((paid_sum / total_b) * 100)|round(1) if total_b > 0 else 100 %}
+            {% set rate_pct = ((paid_sum / total_b) * 100)|round(1) if total_b > 0 else 0 %}
             <div class="fs-4 fw-bold mt-1 text-dark">{{ rate_pct }}%</div>
             <div class="progress mt-2" style="height: 5px;">
                 <div class="progress-bar bg-success" role="progressbar" style="width: {{ rate_pct }}%;" aria-valuenow="{{ rate_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
@@ -148,7 +148,7 @@
                         <span class="badge bg-light text-dark border">{{ inv.month_period }}</span>
                     </td>
                     <td>
-                        <span class="fw-bold text-dark">{{ inv.plan_name }}</span>
+                        <span class="fw-bold text-dark">{{ inv.plan_name or 'Standard Plan' }}</span>
                     </td>
                     <td>
                         <div class="fs-6 fw-bold text-dark">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(inv.amount) }}</div>
@@ -213,8 +213,12 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="9" class="text-center py-4 text-muted">
-                        No billing invoices found.
+                    <td colspan="8" class="p-0">
+                        <div class="empty-state-box">
+                            <div class="empty-state-icon"><i class="bi bi-receipt-cutoff"></i></div>
+                            <h6 class="fw-bold text-dark mb-1">No Billing Invoices Yet</h6>
+                            <p class="text-muted small mb-0">Once subscribers are registered, generate monthly bills automatically or create single invoices.</p>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -232,8 +236,8 @@
                                 <div class="modal-content">
                                     <form action="{{ url_for('edit_invoice', id=inv.id) }}" method="POST">
                                         <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
-                                            <h5 class="modal-title fw-bold" class="text-dark">
-                                                <i class="bi bi-pencil-square me-2" style="color: #ea580c;"></i> Edit Invoice: {{ inv.invoice_number }}
+                                            <h5 class="modal-title fw-bold text-dark">
+                                                <i class="bi bi-pencil-square me-2" style="color: #2563eb;"></i> Edit Invoice: {{ inv.invoice_number }}
                                             </h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                         </div>
@@ -293,8 +297,8 @@
                                 <div class="modal-content">
                                     <form action="{{ url_for('pay_invoice', id=inv.id) }}" method="POST">
                                         <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
-                                            <h5 class="modal-title fw-bold" class="text-dark">
-                                                <i class="bi bi-cash-stack me-2" style="color: #ea580c;"></i> Collect Payment (Mark as Paid)
+                                            <h5 class="modal-title fw-bold text-dark">
+                                                <i class="bi bi-cash-stack me-2" style="color: #2563eb;"></i> Collect Payment (Mark as Paid)
                                             </h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                         </div>
@@ -355,17 +359,18 @@
         <div class="modal-content">
             <form action="{{ url_for('create_single_invoice') }}" method="POST">
                 <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
-                    <h5 class="modal-title fw-bold" class="text-dark">
-                        <i class="bi bi-file-earmark-plus me-2" style="color: #ea580c;"></i> Generate Custom Invoice
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi bi-file-earmark-plus me-2" style="color: #2563eb;"></i> Generate Custom Invoice
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="mb-3">
                         <label class="form-label fw-bold">Select Customer *</label>
-                        <select name="customer_id" class="form-select" required onchange="document.getElementById('amountInput').value = this.options[this.selectedIndex].getAttribute('data-price') || 1200;">
+                        <select name="customer_id" class="form-select" required onchange="document.getElementById('amountInput').value = this.options[this.selectedIndex].getAttribute('data-price') || 0;">
+                            <option value="">-- Choose Subscriber --</option>
                             {% for c in customers_dropdown %}
-                                <option value="{{ c.id }}" data-price="{{ c.price|int }}">{{ c.full_name }} (@{{ c.pppoe_username }})</option>
+                                <option value="{{ c.id }}" data-price="{{ (c.price or 0)|int }}">{{ c.full_name }} (@{{ c.pppoe_username }})</option>
                             {% endfor %}
                         </select>
                     </div>

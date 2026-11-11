@@ -11,7 +11,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <!-- Google Fonts Preconnect & High-Performance Typography -->
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -28,21 +28,22 @@
             --accent-emerald-light: #ecfdf5;
             --accent-rose: #dc2626;
             --accent-rose-light: #fef2f2;
-            --sidebar-bg: #0f172a;        /* Deep Obsidian Navy */
-            --sidebar-hover: #1e293b;     /* Slate-800 */
-            --sidebar-active: #1e293b;    /* Active Slate */
-            --sidebar-text: #94a3b8;      /* Slate-400 */
-            --body-bg: #f8fafc;           /* Crisp, clean, sober light slate */
-            --border-color: #e2e8f0;      /* Slate-200 border */
-            --card-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
-            --card-shadow-hover: 0 6px 16px -2px rgba(15, 23, 42, 0.08);
+            --sidebar-bg: #0b1120;
+            --sidebar-hover: #162033;
+            --sidebar-active: #1e293b;
+            --sidebar-text: #94a3b8;
+            --body-bg: #f1f5f9;
+            --surface-card: #ffffff;
+            --border-color: #e2e8f0;
+            --card-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+            --card-shadow-hover: 0 10px 24px -4px rgba(15, 23, 42, 0.08);
             --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
             --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
         }
 
         body {
             background-color: var(--body-bg);
-            background-image: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+            background-image: radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.04) 0%, transparent 45%), linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
             font-family: var(--font-sans);
             color: #0f172a;
             overflow-x: hidden;
@@ -55,8 +56,8 @@
             height: 38px;
             border-radius: 50%;
             object-fit: cover;
-            border: 2px solid #2563eb;
-            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+            border: 2px solid #3b82f6;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
             transition: transform 0.2s ease;
         }
         .brand-logo-img:hover {
@@ -69,6 +70,7 @@
             background-color: #10b981;
             border-radius: 50%;
             display: inline-block;
+            flex-shrink: 0;
             box-shadow: 0 0 0 rgba(16, 185, 129, 0.7);
             animation: pulse-ring 2s infinite;
         }
@@ -81,12 +83,33 @@
         .font-monospace, code, kbd, pre {
             font-family: var(--font-mono) !important;
         }
+
+        .table {
+            --bs-table-border-color: #f1f5f9;
+        }
+        .table thead th {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #475569;
+            background-color: #f8fafc;
+            border-bottom: 1.5px solid #e2e8f0;
+            padding-top: 0.85rem;
+            padding-bottom: 0.85rem;
+            white-space: nowrap;
+        }
+        .table tbody td {
+            padding-top: 0.85rem;
+            padding-bottom: 0.85rem;
+        }
         .table-hover > tbody > tr {
             transition: background-color 0.12s ease;
         }
         .table-hover > tbody > tr:hover {
-            background-color: #f1f5f9 !important;
+            background-color: #f8fafc !important;
         }
+
         .btn {
             font-family: var(--font-sans);
             letter-spacing: 0.1px;
@@ -98,11 +121,11 @@
             transform: scale(0.98);
         }
 
-        /* Sober Corporate Sidebar */
+        /* Sidebar Navigation */
         .sidebar {
-            width: 270px;
+            width: 268px;
             height: 100vh;
-            background: #0f172a;
+            background: var(--sidebar-bg);
             position: fixed;
             top: 0;
             left: 0;
@@ -110,60 +133,77 @@
             border-right: 1px solid #1e293b;
             display: flex;
             flex-direction: column;
-            box-shadow: 2px 0 12px rgba(0, 0, 0, 0.25);
-            transition: transform 0.3s ease;
+            box-shadow: 4px 0 20px rgba(2, 6, 23, 0.25);
+            transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .sidebar-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            backdrop-filter: blur(2px);
+            z-index: 1040;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+        .sidebar-backdrop.show {
+            opacity: 1;
+            pointer-events: auto;
         }
         .sidebar-nav-container {
             flex: 1;
             overflow-y: auto;
             scrollbar-width: thin;
-            scrollbar-color: #334155 #0f172a;
+            scrollbar-color: #334155 var(--sidebar-bg);
+            padding-bottom: 1rem;
         }
         .sidebar .brand {
-            padding: 1.1rem 1.25rem;
+            padding: 1.15rem 1.25rem;
             color: #ffffff;
             font-weight: 700;
-            font-size: 1.02rem;
-            border-bottom: 1px solid #1e293b;
+            font-size: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: #0f172a;
+            background: rgba(15, 23, 42, 0.7);
         }
         .sidebar .nav-link {
             color: var(--sidebar-text);
             padding: 0.62rem 1rem;
-            font-size: 0.88rem;
+            font-size: 0.875rem;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 11px;
             margin: 2px 10px;
-            border-radius: 8px;
-            transition: all 0.18s ease;
+            border-radius: 9px;
+            transition: all 0.16s ease;
             font-weight: 500;
             text-decoration: none;
+            border-left: 3px solid transparent;
         }
         .sidebar .nav-link:hover {
-            color: #ffffff;
-            background-color: rgba(255, 255, 255, 0.06);
+            color: #f8fafc;
+            background-color: var(--sidebar-hover);
         }
         .sidebar .nav-link.active {
             color: #ffffff;
-            background: #1e293b;
+            background: linear-gradient(90deg, rgba(37, 99, 235, 0.22) 0%, rgba(30, 41, 59, 0.9) 100%);
             font-weight: 600;
-            border-left: 3.5px solid #2563eb;
+            border-left-color: #3b82f6;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
         }
         .sidebar .nav-link i {
-            font-size: 1.05rem;
-            color: #94a3b8;
+            font-size: 1.02rem;
+            color: #64748b;
             transition: color 0.15s;
         }
         .sidebar .nav-link.active i,
         .sidebar .nav-link:hover i {
-            color: #38bdf8;
+            color: #60a5fa;
         }
         .nav-category {
-            padding: 0.9rem 1.25rem 0.3rem 1.25rem;
+            padding: 0.95rem 1.25rem 0.3rem 1.25rem;
             font-size: 0.65rem;
             text-transform: uppercase;
             letter-spacing: 1.2px;
@@ -171,7 +211,7 @@
             font-weight: 700;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
         }
         .nav-category::after {
             content: "";
@@ -181,25 +221,32 @@
         }
         .sidebar-footer {
             padding: 0.85rem 1.25rem;
-            border-top: 1px solid #1e293b;
-            background: #090d16;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            background: #060a14;
         }
 
         .main-wrapper {
-            margin-left: 270px;
-            padding: 1.5rem 2rem;
+            margin-left: 268px;
+            padding: 1.35rem 1.85rem 2rem;
             min-height: 100vh;
-            transition: margin-left 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            transition: margin-left 0.28s ease;
+        }
+        .main-content-grow {
+            flex: 1;
         }
 
-        /* Top Navbar */
+        /* Sticky Frosted Top Navbar */
         .top-navbar {
-            background: #ffffff;
-            padding: 0.75rem 1.25rem;
-            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 0.72rem 1.25rem;
+            border-radius: 13px;
             box-shadow: var(--card-shadow);
             border: 1px solid var(--border-color);
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.45rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -209,22 +256,22 @@
             z-index: 100;
         }
 
-        /* Sober Hero Banner */
+        /* Executive Hero Banner */
         .hero-orange-banner {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #1e3a8a 100%);
+            background: linear-gradient(135deg, #0b1120 0%, #172554 58%, #1e40af 100%);
             color: #ffffff;
-            padding: 1.6rem 2rem;
-            border-radius: 14px;
-            box-shadow: var(--card-shadow);
-            border: 1px solid #334155;
+            padding: 1.6rem 1.9rem;
+            border-radius: 15px;
+            box-shadow: 0 12px 28px -8px rgba(15, 23, 42, 0.28);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             margin-bottom: 1.5rem;
         }
 
-        /* Sober Stat Cards */
+        /* Card & Stat Surface System */
         .card, .stat-card, .table-card {
-            background: #ffffff;
+            background: var(--surface-card);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
+            border-radius: 13px;
             box-shadow: var(--card-shadow);
         }
         .stat-card {
@@ -241,80 +288,123 @@
         .stat-card.border-warning { border-top-color: #d97706 !important; }
         .stat-card.border-primary { border-top-color: #2563eb !important; }
 
-        /* Corporate Buttons */
+        /* Filter Chips Bar */
+        .filter-chips-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0.42rem 0.9rem;
+            border-radius: 9999px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #475569;
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+            text-decoration: none;
+            transition: all 0.16s ease;
+            cursor: pointer;
+        }
+        .filter-chip:hover {
+            background-color: #f8fafc;
+            border-color: #94a3b8;
+            color: #0f172a;
+        }
+        .filter-chip.active {
+            background-color: #2563eb;
+            border-color: #2563eb;
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+        }
+        .filter-chip.active i {
+            color: #ffffff !important;
+        }
+
+        /* Primary CTA Buttons */
         .btn-orange, .btn-primary {
-            background: #2563eb !important;
+            background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
             color: #ffffff !important;
             border: 1px solid #1d4ed8 !important;
-            box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.22);
         }
         .btn-orange:hover, .btn-primary:hover {
-            background: #1d4ed8 !important;
+            background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%) !important;
             color: #ffffff !important;
             transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
         }
         .btn-outline-orange {
             color: #2563eb;
             border: 1.5px solid #2563eb;
-            background: transparent;
+            background: #ffffff;
         }
         .btn-outline-orange:hover {
             background: #2563eb;
             color: #ffffff;
         }
 
-        /* Clean Decent Badges */
-        .badge-paid { background-color: #ecfdf5; color: #047857; font-weight: 700; border: 1px solid #a7f3d0; border-radius: 6px; padding: 0.25rem 0.55rem; }
-        .badge-unpaid { background-color: #fef2f2; color: #b91c1c; font-weight: 700; border: 1px solid #fecaca; border-radius: 6px; padding: 0.25rem 0.55rem; }
-        .badge-orange { background-color: #fffbeb; color: #b45309; font-weight: 700; border: 1px solid #fde68a; border-radius: 6px; padding: 0.25rem 0.55rem; }
-        .badge-cyan { background-color: #eff6ff; color: #1d4ed8; font-weight: 700; border: 1px solid #bfdbfe; border-radius: 6px; padding: 0.25rem 0.55rem; }
-        .badge-active { background-color: #ecfdf5; color: #047857; font-weight: 700; border: 1px solid #a7f3d0; border-radius: 6px; padding: 0.25rem 0.55rem; }
-        .badge-expired { background-color: #fef2f2; color: #b91c1c; font-weight: 700; border: 1px solid #fecaca; border-radius: 6px; padding: 0.25rem 0.55rem; }
+        /* Status Badges */
+        .badge-paid, .badge-active { background-color: #ecfdf5; color: #047857; font-weight: 700; border: 1px solid #a7f3d0; border-radius: 6px; padding: 0.28rem 0.6rem; }
+        .badge-unpaid, .badge-expired { background-color: #fef2f2; color: #b91c1c; font-weight: 700; border: 1px solid #fecaca; border-radius: 6px; padding: 0.28rem 0.6rem; }
+        .badge-orange { background-color: #fffbeb; color: #b45309; font-weight: 700; border: 1px solid #fde68a; border-radius: 6px; padding: 0.28rem 0.6rem; }
+        .badge-cyan { background-color: #eff6ff; color: #1d4ed8; font-weight: 700; border: 1px solid #bfdbfe; border-radius: 6px; padding: 0.28rem 0.6rem; }
 
         .table-card {
             border-top: 3px solid #2563eb;
             overflow: hidden;
         }
         .table-card .card-header {
-            background: #f8fafc;
+            background: #ffffff;
             border-bottom: 1px solid var(--border-color);
-            padding: 0.95rem 1.25rem;
+            padding: 1rem 1.25rem;
             font-weight: 700;
             color: #0f172a;
         }
 
+        /* Empty States */
+        .empty-state-box {
+            padding: 2.75rem 1.5rem;
+            text-align: center;
+        }
+        .empty-state-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 16px;
+            background: #eff6ff;
+            color: #2563eb;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.65rem;
+            margin-bottom: 0.85rem;
+            border: 1px solid #dbeafe;
+        }
+
+        /* Forms & Modals */
         .form-control, .form-select {
             border: 1.5px solid #cbd5e1;
-            border-radius: 8px;
+            border-radius: 9px;
             font-size: 0.9rem;
-            padding: 0.5rem 0.85rem;
+            padding: 0.54rem 0.85rem;
             color: #0f172a;
             background-color: #ffffff;
         }
         .form-control:focus, .form-select:focus {
             border-color: #2563eb;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
             outline: 0;
         }
 
         .modal-content {
             border: 1px solid var(--border-color) !important;
-            border-radius: 14px;
-            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.18) !important;
-        }
-
-        /* Responsive Layout Overrides */
-        @media (max-width: 991.98px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-            .sidebar.show {
-                transform: translateX(0);
-            }
-            .main-wrapper {
-                margin-left: 0;
-                padding: 1rem 0.85rem;
-            }
+            border-radius: 15px;
+            box-shadow: 0 20px 38px -10px rgba(15, 23, 42, 0.22) !important;
+            overflow: hidden;
         }
 
         /* Telecom Core Color Pills */
@@ -341,29 +431,78 @@
             transition: opacity 0.15s;
         }
         .clickable-copy:hover {
-            opacity: 0.75;
+            opacity: 0.78;
+        }
+
+        /* Fixed Mobile App Bottom Bar */
+        .mobile-bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0.45rem 0.25rem;
+            z-index: 1030;
+        }
+        .mobile-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            color: #64748b;
+            text-decoration: none;
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 0.25rem 0.5rem;
+            border-radius: 8px;
+            min-width: 56px;
+        }
+        .mobile-nav-item i {
+            font-size: 1.15rem;
+        }
+        .mobile-nav-item.active {
+            color: #2563eb;
+            background: #eff6ff;
+        }
+
+        /* Responsive Layout Overrides */
+        @media (max-width: 991.98px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            .main-wrapper {
+                margin-left: 0;
+                padding: 1rem 0.85rem 5.5rem;
+            }
         }
     </style>
 </head>
 <body>
 
-    <!-- Real-Time FTTH Fiber Laser Data Streamer (Top Edge) -->
-    
-
     <!-- Mobile Drawer Backdrop -->
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-    <!-- Full Orange Sidebar -->
+    <!-- Navigation Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="brand">
             <div class="d-flex align-items-center gap-2">
                 <img src="{{ url_for('static', filename='img/sabro_logo.jpg') }}" alt="Sabro Networks Logo" class="brand-logo-img">
                 <div>
-                    <div class="text-white fw-bold" style="font-size: 0.98rem; line-height: 1.2; letter-spacing: 0.3px;">{{ settings.get('isp_name', 'Sabro Networks') }}</div>
-                    <div style="font-size: 0.68rem; color: #fb923c; font-weight: 600;">{{ settings.get('tagline', 'FTTH High-Speed Fiber') }}</div>
+                    <div class="text-white fw-bold" style="font-size: 0.96rem; line-height: 1.2; letter-spacing: 0.2px;">{{ settings.get('isp_name', 'Sabro Networks') }}</div>
+                    <div style="font-size: 0.68rem; color: #60a5fa; font-weight: 600;">{{ settings.get('tagline', 'FTTH High-Speed Fiber') }}</div>
                 </div>
             </div>
-            <button type="button" class="btn btn-sm text-white-50 d-lg-none p-1" id="sidebarCloseBtn">
+            <button type="button" class="btn btn-sm text-white-50 d-lg-none p-1" id="sidebarCloseBtn" aria-label="Close Menu">
                 <i class="bi bi-x-lg fs-5"></i>
             </button>
         </div>
@@ -416,7 +555,6 @@
                         <i class="bi bi-receipt-cutoff"></i> Invoices & Recovery
                     </a>
 
-
                     <div class="nav-category">Field Ops & Support</div>
                     <a href="{{ url_for('tickets_page') }}" class="nav-link {% if request.endpoint == 'tickets_page' %}active{% endif %}">
                         <i class="bi bi-headset"></i> Complaint Tickets
@@ -448,14 +586,14 @@
         </div>
 
         <!-- Vshatkay Solutions Agency Badge -->
-        <div class="px-3 py-2 mx-3 mb-2 rounded-3 shadow-sm" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(234, 88, 12, 0.35);">
+        <div class="px-3 py-2 mx-3 mb-2 rounded-3" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(59, 130, 246, 0.25);">
             <div class="d-flex align-items-center gap-2">
-                <div class="rounded-2 d-flex align-items-center justify-content-center text-white flex-shrink-0" style="width: 28px; height: 28px; background: linear-gradient(135deg, #ea580c, #f97316); font-weight: 800; font-size: 0.72rem; box-shadow: 0 0 10px rgba(234, 88, 12, 0.4);">
+                <div class="rounded-2 d-flex align-items-center justify-content-center text-white flex-shrink-0" style="width: 28px; height: 28px; background: linear-gradient(135deg, #2563eb, #1d4ed8); font-weight: 800; font-size: 0.72rem;">
                     VS
                 </div>
                 <div style="line-height: 1.15;">
                     <div class="text-white fw-bold" style="font-size: 0.74rem; letter-spacing: 0.3px;">{{ settings.get('agency_name', 'Vshatkay Solutions') }}</div>
-                    <div style="font-size: 0.63rem; color: #fed7aa;">Digital Agency & Engineering</div>
+                    <div style="font-size: 0.63rem; color: #93c5fd;">Digital Agency & Engineering</div>
                 </div>
             </div>
         </div>
@@ -463,12 +601,13 @@
         <div class="sidebar-footer">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
-                    <div class="badge bg-warning text-dark fw-bold mb-1" style="font-size: 0.72rem;">
-                        <i class="bi bi-circle-fill text-danger me-1" style="font-size: 0.45rem;"></i> FTTH Live
+                    <div class="d-inline-flex align-items-center gap-1.5 badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 fw-bold mb-1" style="font-size: 0.7rem;">
+                        <span class="pulse-indicator"></span>
+                        <span>FTTH Live</span>
                     </div>
-                    <div class="text-white-50" style="font-size: 0.72rem;">{{ settings.get('isp_name', 'Sabro Networks') }} v3.5</div>
+                    <div class="text-white-50" style="font-size: 0.72rem;">{{ settings.get('isp_name', 'Sabro Networks') }} v3.6</div>
                 </div>
-                <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger py-1 px-2" title="Log Out">
+                <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger py-1 px-2" title="Sign Out">
                     <i class="bi bi-box-arrow-right"></i>
                 </a>
             </div>
@@ -477,147 +616,164 @@
 
     <!-- Main Content Area -->
     <div class="main-wrapper">
-        <!-- Top Navbar -->
-        <div class="top-navbar">
-            <div class="d-flex align-items-center gap-2">
-                <!-- Mobile Drawer Toggle Button -->
-                <button class="btn btn-sm btn-light border d-lg-none" id="sidebarToggle" type="button" aria-label="Toggle Navigation">
-                    <i class="bi bi-list fs-5 text-dark"></i>
-                </button>
-                <img src="{{ url_for('static', filename='img/sabro_logo.jpg') }}" alt="Logo" class="rounded-circle d-lg-none shadow-sm" style="width: 32px; height: 32px; object-fit: cover; border: 2px solid #ea580c;">
-                <span class="badge badge-orange text-uppercase d-none d-sm-inline px-2 py-1" style="font-size: 0.72rem; letter-spacing: 0.5px;">NOC</span>
-                <h5 class="mb-0 fw-bold text-dark fs-6 fs-sm-5">{% block page_title %}Dashboard{% endblock %}</h5>
-            </div>
-            
-            <div class="d-flex align-items-center gap-2 gap-sm-3">
-                <!-- Real-time Live Network Clock -->
-                <div class="d-none d-xl-flex align-items-center gap-2 px-3 py-1 bg-light rounded-pill border text-muted small">
-                    <i class="bi bi-clock text-warning"></i>
-                    <span id="liveClock" class="fw-semibold font-monospace" style="font-size: 0.78rem;">Live Time</span>
-                </div>
-
-                <!-- FTTH Core Live Indicator -->
-                <div class="d-none d-md-flex align-items-center gap-2 px-3 py-1 bg-white rounded-pill border shadow-sm">
-                    <span class="pulse-indicator"></span>
-                    <span class="small fw-bold text-dark" style="font-size: 0.78rem;">FTTH Backbone Live &bull; 99.98%</span>
-                </div>
-
-                <!-- Keyboard Search Shortcut Badge -->
-                <button type="button" class="btn btn-sm btn-light border d-none d-lg-inline-flex align-items-center gap-1 py-1 px-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#shortcutsModal" title="View Keyboard Shortcuts (?)">
-                    <kbd style="font-size: 0.72rem; background:#ffffff; color:#ea580c; border:1px solid #fed7aa; border-radius:4px; padding:1px 5px; font-weight:700;">?</kbd>
-                    <span class="small text-muted">Shortcuts</span>
-                </button>
-
-                {% if current_user and current_user.role == 'Admin' %}
-                <!-- Admin Fast Action Dropdown -->
-                <div class="dropdown d-none d-sm-inline-block">
-                    <button class="btn btn-sm btn-orange dropdown-toggle py-1 px-2 px-md-3 shadow-sm d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-lightning-charge-fill text-warning"></i>
-                        <span class="fw-semibold">Fast Action</span>
+        <div class="main-content-grow">
+            <!-- Top Navbar -->
+            <div class="top-navbar">
+                <div class="d-flex align-items-center gap-2 min-w-0">
+                    <!-- Mobile Drawer Toggle Button -->
+                    <button class="btn btn-sm btn-light border d-lg-none" id="sidebarToggle" type="button" aria-label="Toggle Navigation">
+                        <i class="bi bi-list fs-5 text-dark"></i>
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border" style="border-color: #e2e8f0 !important;">
-                        <li><h6 class="dropdown-header text-uppercase text-muted small fw-bold">Telecom Operations</h6></li>
-                        <li><a class="dropdown-item small" href="{{ url_for('customers_list') }}"><i class="bi bi-person-plus text-primary me-2"></i> Add FTTH Subscriber</a></li>
-                        <li><a class="dropdown-item small" href="{{ url_for('invoices_list') }}"><i class="bi bi-receipt text-success me-2"></i> Invoices & Billing Desk</a></li>
-                        <li><a class="dropdown-item small" href="{{ url_for('tickets_page') }}"><i class="bi bi-headset text-warning me-2"></i> Register Support Ticket</a></li>
-                        <li><a class="dropdown-item small" href="{{ url_for('expenses_page') }}"><i class="bi bi-wallet2 text-danger me-2"></i> Add Daily Expense (Kharcha)</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item small" href="{{ url_for('backup_db') }}"><i class="bi bi-database-down text-info me-2"></i> Instant Database Backup</a></li>
-                    </ul>
+                    <img src="{{ url_for('static', filename='img/sabro_logo.jpg') }}" alt="Logo" class="rounded-circle d-lg-none shadow-sm flex-shrink-0" style="width: 30px; height: 30px; object-fit: cover; border: 2px solid #2563eb;">
+                    <span class="badge badge-cyan text-uppercase d-none d-sm-inline px-2 py-1 flex-shrink-0" style="font-size: 0.7rem; letter-spacing: 0.6px;">NOC</span>
+                    <h5 class="mb-0 fw-bold text-dark fs-6 fs-sm-5 text-truncate">{% block page_title %}Dashboard{% endblock %}</h5>
                 </div>
-                {% endif %}
+                
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                    <!-- Real-time Live Network Clock -->
+                    <div class="d-none d-xl-flex align-items-center gap-2 px-3 py-1 bg-light rounded-pill border text-muted small">
+                        <i class="bi bi-clock text-primary"></i>
+                        <span id="liveClock" class="fw-semibold font-monospace" style="font-size: 0.76rem;">Live Time</span>
+                    </div>
 
-                {% if current_user %}
-                <!-- Current User Dropdown -->
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2 py-1 px-2 shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <img src="{{ current_user.avatar_url }}" alt="PFP" class="rounded-circle flex-shrink-0" style="width: 26px; height: 26px; object-fit: cover; border: 1.5px solid {% if current_user.role == 'Admin' %}#ea580c{% elif current_user.role == 'Complaint Boy' %}#f59e0b{% elif current_user.role == 'Recovery Boy' %}#10b981{% else %}#cbd5e1{% endif %};">
-                        <span class="fw-semibold small d-none d-sm-inline">{{ current_user.name }}</span>
-                        {% if current_user.role == 'Admin' %}
-                            <span class="badge bg-dark text-white border small ms-1">{{ current_user.role }}</span>
-                        {% elif current_user.role == 'Complaint Boy' %}
-                            <span class="badge bg-warning text-dark border small ms-1 fw-bold"><i class="bi bi-star-fill text-danger me-1"></i>LVL {{ current_user.level_info.level }}</span>
-                        {% elif current_user.role == 'Recovery Boy' %}
-                            <span class="badge bg-success text-white border small ms-1">{{ current_user.role }}</span>
-                        {% else %}
-                            <span class="badge bg-light text-dark border small ms-1">{{ current_user.role }}</span>
-                        {% endif %}
+                    <!-- FTTH Core Live Indicator -->
+                    <div class="d-none d-md-flex align-items-center gap-2 px-3 py-1 bg-white rounded-pill border shadow-sm">
+                        <span class="pulse-indicator"></span>
+                        <span class="small fw-bold text-dark" style="font-size: 0.76rem;">FTTH System Active</span>
+                    </div>
+
+                    <!-- Keyboard Search Shortcut Badge -->
+                    <button type="button" class="btn btn-sm btn-light border d-none d-lg-inline-flex align-items-center gap-1 py-1 px-2" data-bs-toggle="modal" data-bs-target="#shortcutsModal" title="View Keyboard Shortcuts (?)">
+                        <kbd style="font-size: 0.72rem; background:#ffffff; color:#2563eb; border:1px solid #bfdbfe; border-radius:4px; padding:1px 5px; font-weight:700;">?</kbd>
+                        <span class="small text-muted">Shortcuts</span>
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border p-2" style="border-color: #e2e8f0 !important; min-width: 275px;">
-                        <li class="p-2 border-bottom mb-2 bg-light rounded-2">
-                            <div class="d-flex align-items-center gap-2">
-                                <img src="{{ current_user.avatar_url }}" alt="Avatar" class="rounded-circle shadow-sm flex-shrink-0" style="width: 44px; height: 44px; object-fit: cover; border: 2px solid {% if current_user.role == 'Admin' %}#ea580c{% elif current_user.role == 'Complaint Boy' %}#f59e0b{% elif current_user.role == 'Recovery Boy' %}#10b981{% else %}#cbd5e1{% endif %};">
-                                <div class="overflow-hidden">
-                                    <div class="fw-bold text-dark text-truncate" style="font-size: 0.9rem;">{{ current_user.name }}</div>
-                                    <div class="small text-muted font-monospace">@{{ current_user.username }}</div>
-                                    <span class="badge {% if current_user.role == 'Admin' %}bg-dark text-white{% elif current_user.role == 'Complaint Boy' %}bg-warning text-dark{% elif current_user.role == 'Recovery Boy' %}bg-success text-white{% else %}bg-secondary text-white{% endif %} mt-1" style="font-size: 0.65rem;">{{ current_user.role }}</span>
-                                </div>
-                            </div>
-                            {% if current_user.role == 'Complaint Boy' and current_user.level_info %}
-                            <!-- Tech Rank & Level Progression -->
-                            <div class="mt-2 pt-2 border-top">
-                                <div class="d-flex justify-content-between align-items-center small mb-1">
-                                    <span class="fw-bold text-dark" style="font-size: 0.76rem;"><i class="bi bi-award-fill text-warning me-1"></i>LVL {{ current_user.level_info.level }}: {{ current_user.level_info.title }}</span>
-                                    <span class="font-monospace text-muted fw-bold" style="font-size: 0.72rem;">{{ current_user.level_info.xp }} XP</span>
-                                </div>
-                                <div class="progress" style="height: 6px;">
-                                    <div class="progress-bar bg-warning progress-bar-striped progress-bar-animated" role="progressbar" style="width: {{ current_user.level_info.progress_pct }}%"></div>
-                                </div>
-                                <div class="small text-muted mt-1" style="font-size: 0.68rem;">
-                                    {% if current_user.level_info.is_max %}
-                                        <i class="bi bi-trophy-fill text-warning me-1"></i>Max Level reached! ({{ current_user.level_info.resolved_count }} resolved)
-                                    {% else %}
-                                        {{ current_user.level_info.needed_for_next }} tickets to reach Level {{ current_user.level_info.level + 1 }}
-                                    {% endif %}
-                                </div>
-                            </div>
-                            {% endif %}
-                        </li>
-                        <li>
-                            <button type="button" class="dropdown-item small py-2 rounded-1 fw-semibold text-primary" data-bs-toggle="modal" data-bs-target="#changePfpModal">
-                                <i class="bi bi-camera-fill me-2"></i> Update Profile Picture (PFP)
-                            </button>
-                        </li>
-                        {% if current_user.area %}
-                            <li><span class="dropdown-item-text small text-muted"><i class="bi bi-geo-alt text-danger me-2"></i> Sector: {{ current_user.area }}</span></li>
-                        {% endif %}
-                        <li><hr class="dropdown-divider my-1"></li>
-                        {% if current_user.role == 'Admin' %}
-                            <li><a class="dropdown-item small py-1.5" href="{{ url_for('backup_db') }}"><i class="bi bi-database-down text-info me-2"></i> Download DB Backup</a></li>
-                            <li><a class="dropdown-item small py-1.5" href="{{ url_for('staff_list') }}"><i class="bi bi-people text-warning me-2"></i> Manage Staff & PFPs</a></li>
-                            <li><a class="dropdown-item small py-1.5" href="{{ url_for('settings_page') }}"><i class="bi bi-gear text-secondary me-2"></i> System Settings</a></li>
+
+                    {% if current_user and current_user.role == 'Admin' %}
+                    <!-- Admin Fast Action Dropdown -->
+                    <div class="dropdown d-none d-sm-inline-block">
+                        <button class="btn btn-sm btn-orange dropdown-toggle py-1 px-2 px-md-3 shadow-sm d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-lightning-charge-fill"></i>
+                            <span class="fw-semibold">Fast Action</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border" style="border-color: #e2e8f0 !important; border-radius: 12px;">
+                            <li><h6 class="dropdown-header text-uppercase text-muted small fw-bold">Quick Operations</h6></li>
+                            <li><a class="dropdown-item small py-2" href="{{ url_for('customers_list') }}"><i class="bi bi-person-plus text-primary me-2"></i> Add FTTH Subscriber</a></li>
+                            <li><a class="dropdown-item small py-2" href="{{ url_for('tariffs_list') }}"><i class="bi bi-hdd-network text-info me-2"></i> Speed Packages</a></li>
+                            <li><a class="dropdown-item small py-2" href="{{ url_for('invoices_list') }}"><i class="bi bi-receipt text-success me-2"></i> Invoices & Billing Desk</a></li>
+                            <li><a class="dropdown-item small py-2" href="{{ url_for('tickets_page') }}"><i class="bi bi-headset text-warning me-2"></i> Register Support Ticket</a></li>
+                            <li><a class="dropdown-item small py-2" href="{{ url_for('expenses_page') }}"><i class="bi bi-wallet2 text-danger me-2"></i> Add Daily Expense</a></li>
                             <li><hr class="dropdown-divider my-1"></li>
-                        {% endif %}
-                        <li>
-                            <a class="dropdown-item text-danger fw-semibold small py-1.5" href="{{ url_for('logout') }}">
-                                <i class="bi bi-box-arrow-right me-2"></i> Sign Out
-                            </a>
-                        </li>
-                    </ul>
+                            <li><a class="dropdown-item small py-2" href="{{ url_for('backup_db') }}"><i class="bi bi-database-down text-primary me-2"></i> Instant Database Backup</a></li>
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    {% if current_user %}
+                    <!-- Current User Dropdown -->
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2 py-1 px-2 shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <img src="{{ current_user.avatar_url }}" alt="PFP" class="rounded-circle flex-shrink-0" style="width: 26px; height: 26px; object-fit: cover; border: 1.5px solid {% if current_user.role == 'Admin' %}#2563eb{% elif current_user.role == 'Complaint Boy' %}#f59e0b{% elif current_user.role == 'Recovery Boy' %}#10b981{% else %}#cbd5e1{% endif %};">
+                            <span class="fw-semibold small d-none d-sm-inline">{{ current_user.name }}</span>
+                            {% if current_user.role == 'Admin' %}
+                                <span class="badge bg-dark text-white small ms-1">{{ current_user.role }}</span>
+                            {% elif current_user.role == 'Complaint Boy' %}
+                                <span class="badge bg-warning text-dark small ms-1 fw-bold"><i class="bi bi-star-fill text-danger me-1"></i>LVL {{ current_user.level_info.level }}</span>
+                            {% elif current_user.role == 'Recovery Boy' %}
+                                <span class="badge bg-success text-white small ms-1">{{ current_user.role }}</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border small ms-1">{{ current_user.role }}</span>
+                            {% endif %}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border p-2" style="border-color: #e2e8f0 !important; min-width: 275px; border-radius: 14px;">
+                            <li class="p-2 border-bottom mb-2 bg-light rounded-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <img src="{{ current_user.avatar_url }}" alt="Avatar" class="rounded-circle shadow-sm flex-shrink-0" style="width: 44px; height: 44px; object-fit: cover; border: 2px solid {% if current_user.role == 'Admin' %}#2563eb{% elif current_user.role == 'Complaint Boy' %}#f59e0b{% elif current_user.role == 'Recovery Boy' %}#10b981{% else %}#cbd5e1{% endif %};">
+                                    <div class="overflow-hidden">
+                                        <div class="fw-bold text-dark text-truncate" style="font-size: 0.9rem;">{{ current_user.name }}</div>
+                                        <div class="small text-muted font-monospace">@{{ current_user.username }}</div>
+                                        <span class="badge {% if current_user.role == 'Admin' %}bg-dark text-white{% elif current_user.role == 'Complaint Boy' %}bg-warning text-dark{% elif current_user.role == 'Recovery Boy' %}bg-success text-white{% else %}bg-secondary text-white{% endif %} mt-1" style="font-size: 0.65rem;">{{ current_user.role }}</span>
+                                    </div>
+                                </div>
+                                {% if current_user.role == 'Complaint Boy' and current_user.level_info %}
+                                <div class="mt-2 pt-2 border-top">
+                                    <div class="d-flex justify-content-between align-items-center small mb-1">
+                                        <span class="fw-bold text-dark" style="font-size: 0.76rem;"><i class="bi bi-award-fill text-warning me-1"></i>LVL {{ current_user.level_info.level }}: {{ current_user.level_info.title }}</span>
+                                        <span class="font-monospace text-muted fw-bold" style="font-size: 0.72rem;">{{ current_user.level_info.xp }} XP</span>
+                                    </div>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar bg-warning progress-bar-striped progress-bar-animated" role="progressbar" style="width: {{ current_user.level_info.progress_pct }}%"></div>
+                                    </div>
+                                    <div class="small text-muted mt-1" style="font-size: 0.68rem;">
+                                        {% if current_user.level_info.is_max %}
+                                            <i class="bi bi-trophy-fill text-warning me-1"></i>Max Level reached! ({{ current_user.level_info.resolved_count }} resolved)
+                                        {% else %}
+                                            {{ current_user.level_info.needed_for_next }} tickets to reach Level {{ current_user.level_info.level + 1 }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item small py-2 rounded-2 fw-semibold text-primary" data-bs-toggle="modal" data-bs-target="#changePfpModal">
+                                    <i class="bi bi-camera-fill me-2"></i> Update Profile Picture (PFP)
+                                </button>
+                            </li>
+                            {% if current_user.area %}
+                                <li><span class="dropdown-item-text small text-muted"><i class="bi bi-geo-alt text-danger me-2"></i> Sector: {{ current_user.area }}</span></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider my-1"></li>
+                            {% if current_user.role == 'Admin' %}
+                                <li><a class="dropdown-item small py-1.5 rounded-2" href="{{ url_for('backup_db') }}"><i class="bi bi-database-down text-info me-2"></i> Download DB Backup</a></li>
+                                <li><a class="dropdown-item small py-1.5 rounded-2" href="{{ url_for('staff_list') }}"><i class="bi bi-people text-primary me-2"></i> Manage Staff & Password</a></li>
+                                <li><a class="dropdown-item small py-1.5 rounded-2" href="{{ url_for('settings_page') }}"><i class="bi bi-gear text-secondary me-2"></i> System Settings</a></li>
+                                <li><hr class="dropdown-divider my-1"></li>
+                            {% endif %}
+                            <li>
+                                <a class="dropdown-item text-danger fw-semibold small py-1.5 rounded-2" href="{{ url_for('logout') }}">
+                                    <i class="bi bi-box-arrow-right me-2"></i> Sign Out
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-sm btn-orange">Login</a>
+                    {% endif %}
                 </div>
-                {% else %}
-                <a href="{{ url_for('login') }}" class="btn btn-sm btn-orange">Login</a>
-                {% endif %}
             </div>
+
+            <!-- Flash messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm border-0" role="alert">
+                            <i class="bi bi-info-circle-fill me-2"></i> {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
         </div>
 
-        <!-- Flash messages -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
-                        <i class="bi bi-info-circle-fill me-2"></i> {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        {% block content %}{% endblock %}
+        <!-- Global Agency & Telecom Footer -->
+        <footer class="mt-5 pt-3 pb-2 border-top" style="border-color: #e2e8f0 !important;">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 small text-muted">
+                <div>
+                    &copy; {{ now_year or 2026 }} <strong class="text-dark">{{ settings.get('isp_name', 'Sabro Networks') }}</strong> &bull; All Rights Reserved
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap justify-content-center">
+                    <span class="badge bg-dark text-white px-2.5 py-1 shadow-sm" style="font-size: 0.72rem; letter-spacing: 0.3px;">
+                        <i class="bi bi-code-slash text-info me-1"></i> Engineered by <strong>{{ settings.get('agency_name', 'Vshatkay Solutions') }}</strong>
+                    </span>
+                    <span class="text-muted small d-none d-sm-inline">&bull; {{ settings.get('agency_tagline', 'Software Engineering & Telecom Solutions Agency') }}</span>
+                </div>
+            </div>
+        </footer>
     </div>
 
-    <!-- Mobile Bottom App Navigation Bar (Native Mobile Experience) -->
-    <nav class="mobile-bottom-nav d-lg-none shadow">
+    <!-- Mobile Bottom App Navigation Bar -->
+    <nav class="mobile-bottom-nav d-lg-none shadow-lg">
         {% if current_user and current_user.role == 'Recovery Boy' %}
             <a href="{{ url_for('dashboard') }}" class="mobile-nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
                 <i class="bi bi-bicycle"></i>
@@ -682,22 +838,6 @@
                 </div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
-            <!-- Global Agency & Telecom Footer -->
-            <footer class="mt-5 pt-3 pb-3 border-top text-center" style="border-color: rgba(234, 88, 12, 0.18) !important;">
-                <div class="container-fluid px-0">
-                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 small text-muted">
-                        <div>
-                            &copy; {{ now_year or 2026 }} <strong>{{ settings.get('isp_name', 'Sabro Networks') }}</strong> &bull; All Rights Reserved
-                        </div>
-                        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-center">
-                            <span class="badge bg-dark text-white px-2 py-1 shadow-sm" style="font-size: 0.72rem; letter-spacing: 0.4px;">
-                                <i class="bi bi-code-slash text-warning me-1"></i> Developed & Engineered by <strong>{{ settings.get('agency_name', 'Vshatkay Solutions') }}</strong>
-                            </span>
-                            <span class="text-muted small d-none d-sm-inline">&bull; {{ settings.get('agency_tagline', 'Software Engineering & Telecom Agency') }}</span>
-                        </div>
-                    </div>
-                </div>
-            </footer>
         </div>
     </div>
 
@@ -705,16 +845,16 @@
     <div class="modal fade" id="shortcutsModal" tabindex="-1" aria-labelledby="shortcutsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
-                <div class="modal-header bg-dark text-white" style="border-top-left-radius: 14px; border-top-right-radius: 14px;">
+                <div class="modal-header bg-dark text-white">
                     <h6 class="modal-title fw-bold" id="shortcutsModalLabel">
-                        <i class="bi bi-keyboard me-2 text-warning"></i> Sabro Networks Keyboard Shortcuts
+                        <i class="bi bi-keyboard me-2 text-info"></i> Keyboard Shortcuts
                     </h6>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="list-group list-group-flush">
                         <div class="list-group-item d-flex justify-content-between align-items-center px-0">
-                            <span><i class="bi bi-search text-warning me-2"></i> Focus Live Search</span>
+                            <span><i class="bi bi-search text-primary me-2"></i> Focus Live Search</span>
                             <kbd class="px-2 py-1 bg-light border text-dark fw-bold" style="font-family: var(--font-mono); font-size: 0.8rem;">/</kbd>
                         </div>
                         <div class="list-group-item d-flex justify-content-between align-items-center px-0">
@@ -754,8 +894,8 @@
                             </div>
                         </div>
                     </div>
-                    <div class="alert alert-light border small text-muted mt-3 mb-0" style="background-color: #fff7ed; border-color: #fed7aa !important;">
-                        <i class="bi bi-lightbulb-fill text-warning me-1"></i> <strong>Pro-Tip:</strong> Click on any <span class="font-monospace text-primary">@username</span>, phone number, ticket #, or invoice # anywhere across the system to copy it instantly with a single click.
+                    <div class="alert alert-light border small text-muted mt-3 mb-0" style="background-color: #eff6ff; border-color: #bfdbfe !important;">
+                        <i class="bi bi-lightbulb-fill text-primary me-1"></i> <strong>Pro-Tip:</strong> Click any <span class="font-monospace text-primary">@username</span>, phone number, ticket #, or invoice # anywhere across the system to copy it instantly.
                     </div>
                 </div>
             </div>
@@ -765,7 +905,6 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Subtle Web Audio Feedback Synthesizer (0 latency, 0 bandwidth)
         function playFeedbackSound() {
             try {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -785,7 +924,6 @@
             } catch (e) {}
         }
 
-        // Live Network Clock (Updates every second)
         function updateLiveClock() {
             const clockEl = document.getElementById('liveClock');
             if (!clockEl) return;
@@ -804,7 +942,6 @@
         updateLiveClock();
         setInterval(updateLiveClock, 1000);
 
-        // Toast Notification Helper
         function showToast(message, iconClass = 'bi-check-circle-fill text-success') {
             const toastEl = document.getElementById('liveToast');
             const msgEl = document.getElementById('toastMsg');
@@ -816,7 +953,6 @@
             toast.show();
         }
 
-        // 1-Click Interactive Copy Helper with Tone
         function copyToClipboard(text, label = 'Copied') {
             playFeedbackSound();
             if (!navigator.clipboard) {
@@ -836,11 +972,9 @@
             });
         }
 
-        // Global Keyboard Shortcuts
         document.addEventListener('keydown', (e) => {
             const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
             
-            // '/' : Focus search input
             if (e.key === '/' && !inInput) {
                 e.preventDefault();
                 const searchInput = document.querySelector('input[type="text"][placeholder*="Search"], input[id$="Search"]');
@@ -849,7 +983,6 @@
                     searchInput.select();
                 }
             } 
-            // '?' : Show keyboard shortcuts modal
             else if (e.key === '?' && !inInput) {
                 e.preventDefault();
                 const modalEl = document.getElementById('shortcutsModal');
@@ -858,14 +991,12 @@
                     modal.show();
                 }
             }
-            // 'Esc' : Unfocus search
             else if (e.key === 'Escape') {
                 const searchInput = document.querySelector('input[type="text"][placeholder*="Search"], input[id$="Search"]');
                 if (searchInput && document.activeElement === searchInput) {
                     searchInput.blur();
                 }
             }
-            // Alt + Number fast navigation
             else if (e.altKey && !e.ctrlKey && !e.shiftKey) {
                 if (e.key === '1') { window.location.href = "{{ url_for('dashboard') }}"; }
                 else if (e.key === '2') { window.location.href = "{{ url_for('customers_list') }}"; }
@@ -874,7 +1005,6 @@
             }
         });
 
-        // Mobile Sidebar Drawer Toggle Logic
         const sidebar = document.getElementById('sidebar');
         const sidebarToggle = document.getElementById('sidebarToggle');
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -895,7 +1025,6 @@
         if (sidebarCloseBtn) sidebarCloseBtn.addEventListener('click', closeSidebar);
         if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeSidebar);
 
-        // Close sidebar on link click on mobile
         document.querySelectorAll('.sidebar .nav-link').forEach(link => {
             link.addEventListener('click', () => {
                 if (window.innerWidth < 992) {
@@ -904,7 +1033,6 @@
             });
         });
 
-        // Auto-fade flash alerts after 4 seconds
         setTimeout(() => {
             const alerts = document.querySelectorAll('.alert-success, .alert-info');
             alerts.forEach(alert => {
@@ -913,7 +1041,6 @@
             });
         }, 4000);
 
-        // Universal Live Table Filter Utility with optional Counter Badge
         function attachLiveSearch(searchInputId, tableId, counterBadgeId) {
             const input = document.getElementById(searchInputId);
             const table = document.getElementById(tableId);
@@ -949,17 +1076,17 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
                 <form action="{{ url_for('update_profile_pfp') }}" method="POST" enctype="multipart/form-data">
-                    <div class="modal-header bg-dark text-white" style="border-top-left-radius: 14px; border-top-right-radius: 14px;">
+                    <div class="modal-header bg-dark text-white">
                         <h6 class="modal-title fw-bold" id="changePfpModalLabel">
-                            <i class="bi bi-camera me-2 text-warning"></i> Update Profile Picture (PFP)
+                            <i class="bi bi-camera me-2 text-info"></i> Update Profile Picture (PFP)
                         </h6>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body p-4 text-center">
                         <div class="mb-3">
                             <div class="position-relative d-inline-block">
-                                <img id="pfpPreviewImage" src="{{ current_user.avatar_url }}" alt="Profile Preview" class="rounded-circle shadow" style="width: 100px; height: 100px; object-fit: cover; border: 3px solid #ea580c;">
-                                <span class="position-absolute bottom-0 end-0 badge rounded-pill bg-dark border text-warning p-2">
+                                <img id="pfpPreviewImage" src="{{ current_user.avatar_url }}" alt="Profile Preview" class="rounded-circle shadow" style="width: 100px; height: 100px; object-fit: cover; border: 3px solid #2563eb;">
+                                <span class="position-absolute bottom-0 end-0 badge rounded-pill bg-dark border text-info p-2">
                                     <i class="bi bi-person-fill"></i>
                                 </span>
                             </div>
@@ -976,10 +1103,10 @@
                         </div>
 
                         <div class="alert alert-light border small text-muted text-start mb-0" style="background-color: #f8fafc;">
-                            <i class="bi bi-info-circle text-primary me-1"></i> Your avatar will appear on top navbar, assigned tickets, dispatch summaries, and staff directories.
+                            <i class="bi bi-info-circle text-primary me-1"></i> Your avatar appears in top navbar, assigned tickets, and staff directories.
                         </div>
                     </div>
-                    <div class="modal-footer bg-light" style="border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;">
+                    <div class="modal-footer bg-light">
                         <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-orange btn-sm px-4 fw-bold"><i class="bi bi-check-lg me-1"></i> Upload & Save PFP</button>
                     </div>

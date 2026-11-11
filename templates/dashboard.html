@@ -473,44 +473,74 @@
 <!--          ADMIN FTTH COMPLAINTS OPERATIONS COMMAND CENTER (MNC GRADE)      -->
 <!-- ========================================================================= -->
 
-<!-- Multinational Executive Header & Live Optical NOC Telemetry Banner -->
-<div class="hero-orange-banner mb-4" style="background: linear-gradient(135deg, #090e1a 0%, #0f172a 45%, #1e293b 85%, #1e3a8a 100%); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.35); border-radius: 14px;">
+<!-- Executive Header Banner -->
+<div class="hero-orange-banner mb-4">
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
         <div>
-            <!-- Live Telemetry Badges -->
             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                <span class="badge text-white fw-bold px-2.5 py-1 text-uppercase d-inline-flex align-items-center" style="background-color: #059669; font-size: 0.72rem; letter-spacing: 0.8px; border-radius: 6px;">
-                    <span class="pulse-indicator me-1.5" style="background-color: #34d399;"></span> Live NOC Complaints Desk
+                <span class="badge text-white fw-bold px-2.5 py-1 text-uppercase d-inline-flex align-items-center gap-2" style="background-color: #059669; font-size: 0.7rem; letter-spacing: 0.8px; border-radius: 6px;">
+                    <span class="pulse-indicator" style="background-color: #34d399;"></span>
+                    <span>Live NOC Complaints Desk</span>
                 </span>
-                <span class="badge bg-dark bg-opacity-60 text-light border border-white border-opacity-20 small px-2 py-1 font-monospace" style="font-size: 0.72rem; border-radius: 6px;">
-                    <i class="bi bi-shield-check text-success me-1"></i>SLA: 99.8% Nominal
+                <span class="badge bg-dark bg-opacity-50 text-light border border-white border-opacity-25 small px-2.5 py-1 font-monospace" style="font-size: 0.72rem; border-radius: 6px;">
+                    <i class="bi bi-people-fill text-info me-1"></i>{{ active_customers }} Active / {{ total_customers }} Subscribers
                 </span>
-                <span class="badge bg-dark bg-opacity-60 text-light border border-white border-opacity-20 small px-2 py-1 font-monospace d-none d-sm-inline-block" style="font-size: 0.72rem; border-radius: 6px;">
-                    <i class="bi bi-broadcast text-info me-1"></i>Backbone 10G FTTH
+                <span class="badge bg-dark bg-opacity-50 text-light border border-white border-opacity-25 small px-2.5 py-1 font-monospace d-none d-sm-inline-block" style="font-size: 0.72rem; border-radius: 6px;">
+                    <i class="bi bi-shield-lock-fill text-success me-1"></i>Main Admin: @{{ current_user.username if current_user else 'ahmedbaloch' }}
                 </span>
             </div>
             
-            <h2 class="fw-bold mb-1 text-white d-flex align-items-center gap-2" style="font-size: 1.65rem; letter-spacing: -0.3px;">
-                <span>Sabro Networks • Complaints Center</span>
+            <h2 class="fw-bold mb-1 text-white d-flex align-items-center gap-2" style="font-size: 1.6rem; letter-spacing: -0.3px;">
+                <span>{{ settings.get('isp_name', 'Sabro Networks') }} &bull; Complaints Center</span>
             </h2>
-            <p class="mb-0 text-white text-opacity-80 small" style="max-width: 720px; line-height: 1.5;">
-                FTTH subscriber fault monitoring, optical drop line telemetry, and field technician dispatch queue.
+            <p class="mb-0 text-white text-opacity-75 small" style="max-width: 720px; line-height: 1.5;">
+                FTTH subscriber fault monitoring, optical drop line tracking, and operations command center.
             </p>
         </div>
 
         <!-- Executive Quick Actions -->
         <div class="d-flex flex-wrap align-items-center gap-2">
-            <button type="button" class="btn btn-warning text-dark fw-bold px-3 py-2 shadow-sm d-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#adminNewComplaintModal" style="border-radius: 8px;">
-                <i class="bi bi-plus-lg fs-6"></i>
+            <button type="button" class="btn btn-light text-dark fw-bold px-3 py-2 shadow-sm d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#adminNewComplaintModal">
+                <i class="bi bi-plus-circle-fill text-primary"></i>
                 <span>Log New Complaint</span>
             </button>
-            <a href="{{ url_for('tickets_page') }}" class="btn btn-outline-light fw-semibold px-3 py-2 d-flex align-items-center gap-1.5" style="border-radius: 8px; border-color: rgba(255, 255, 255, 0.35);">
-                <i class="bi bi-headset fs-6"></i>
+            <a href="{{ url_for('customers_list') }}" class="btn btn-outline-light fw-semibold px-3 py-2 d-flex align-items-center gap-2">
+                <i class="bi bi-people"></i>
+                <span>Subscribers</span>
+            </a>
+            <a href="{{ url_for('tickets_page') }}" class="btn btn-outline-light fw-semibold px-3 py-2 d-flex align-items-center gap-2">
+                <i class="bi bi-headset"></i>
                 <span>Tickets Directory</span>
             </a>
         </div>
     </div>
 </div>
+
+{% if total_customers == 0 %}
+<!-- Clean Initial Portal Onboarding Strip (Automatically hides once first subscriber is added) -->
+<div class="card mb-4 border-primary border-opacity-25 shadow-sm" style="background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);">
+    <div class="card-body p-3 p-md-4">
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+            <div>
+                <span class="badge badge-cyan mb-2"><i class="bi bi-stars me-1"></i>Fresh Portal Ready</span>
+                <h5 class="fw-bold text-dark mb-1">Welcome, {{ current_user.name if current_user else 'Ahmed Baloch' }} — Start Your ISP Setup</h5>
+                <p class="text-muted small mb-0">All demo records have been cleared. Follow these 3 quick steps to launch your live operations:</p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ url_for('settings_page') }}" class="btn btn-sm btn-outline-secondary fw-semibold">
+                    <i class="bi bi-gear me-1"></i> 1. Configure Info &amp; WhatsApp
+                </a>
+                <a href="{{ url_for('tariffs_list') }}" class="btn btn-sm btn-outline-orange fw-semibold">
+                    <i class="bi bi-hdd-network me-1"></i> 2. Add Speed Packages
+                </a>
+                <a href="{{ url_for('customers_list') }}" class="btn btn-sm btn-orange fw-bold shadow-sm">
+                    <i class="bi bi-person-plus-fill me-1"></i> 3. Add First Subscriber
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- 4 Focused Complaint & Outage Metric Cards -->
 <div class="row g-3 mb-4">
@@ -522,7 +552,7 @@
                     <i class="bi bi-radioactive"></i> Critical Outages
                 </span>
                 {% if critical_complaints_count > 0 %}
-                <span class="badge bg-danger text-white pulse-indicator"></span>
+                <span class="badge bg-danger text-white d-inline-flex align-items-center gap-1" style="font-size: 0.65rem;"><span class="pulse-indicator" style="background:#fff;width:6px;height:6px;"></span>Urgent</span>
                 {% else %}
                 <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 small" style="font-size: 0.65rem;">Clear</span>
                 {% endif %}
@@ -599,34 +629,34 @@
     </div>
 </div>
 
-<!-- Multinational Telemetry & Operational Summary Strip -->
-<div class="card mb-4 border-0 shadow-sm" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
-    <div class="card-body py-2.5 px-3">
-        <div class="row align-items-center g-2 text-center text-md-start">
+<!-- Live Operations Summary Strip -->
+<div class="card mb-4 shadow-sm" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 13px;">
+    <div class="card-body py-3 px-3 px-md-4">
+        <div class="row align-items-center g-3 text-center text-md-start">
             <div class="col-12 col-md-4">
-                <div class="d-flex align-items-center justify-content-center justify-content-md-start gap-2">
-                    <span class="badge bg-primary p-2 rounded-circle"><i class="bi bi-speedometer text-white"></i></span>
+                <div class="d-flex align-items-center justify-content-center justify-content-md-start gap-3">
+                    <span class="badge bg-primary bg-opacity-10 text-primary p-2.5 rounded-3 border border-primary border-opacity-25"><i class="bi bi-people-fill fs-5"></i></span>
                     <div>
-                        <div class="small fw-bold text-dark mb-0">Mean Time To Repair (MTTR): <span class="text-primary font-monospace">~38 Mins</span></div>
-                        <div class="text-muted" style="font-size: 0.72rem;">Measured across optical drop wire & LOS resolutions</div>
+                        <div class="small fw-bold text-dark mb-0">Subscribers: <span class="text-primary font-monospace">{{ active_customers }} Active / {{ total_customers }} Total</span></div>
+                        <div class="text-muted" style="font-size: 0.72rem;">{{ expired_customers }} Expired &bull; {{ suspended_customers }} Suspended</div>
                     </div>
                 </div>
             </div>
-            <div class="col-12 col-md-4 border-start-md">
-                <div class="d-flex align-items-center justify-content-center justify-content-md-start gap-2">
-                    <span class="badge bg-success p-2 rounded-circle"><i class="bi bi-diagram-3-fill text-white"></i></span>
+            <div class="col-12 col-md-4">
+                <div class="d-flex align-items-center justify-content-center justify-content-md-start gap-3">
+                    <span class="badge bg-success bg-opacity-10 text-success p-2.5 rounded-3 border border-success border-opacity-25"><i class="bi bi-headset fs-5"></i></span>
                     <div>
-                        <div class="small fw-bold text-dark mb-0">Optical Drop Network: <span class="text-success font-monospace">99.85% Health</span></div>
-                        <div class="text-muted" style="font-size: 0.72rem;">Active PON splitters, FDB enclosures & drop spans</div>
+                        <div class="small fw-bold text-dark mb-0">Active Tickets: <span class="text-success font-monospace">{{ open_tickets }} Open / In Progress</span></div>
+                        <div class="text-muted" style="font-size: 0.72rem;">Real-time optical drop fault &amp; support queue</div>
                     </div>
                 </div>
             </div>
-            <div class="col-12 col-md-4 border-start-md">
-                <div class="d-flex align-items-center justify-content-center justify-content-md-start gap-2">
-                    <span class="badge bg-dark p-2 rounded-circle"><i class="bi bi-people-fill text-warning"></i></span>
+            <div class="col-12 col-md-4">
+                <div class="d-flex align-items-center justify-content-center justify-content-md-start gap-3">
+                    <span class="badge bg-dark bg-opacity-10 text-dark p-2.5 rounded-3 border"><i class="bi bi-person-badge-fill fs-5"></i></span>
                     <div>
-                        <div class="small fw-bold text-dark mb-0">Field Crew Capacity: <span class="text-dark font-monospace">{{ all_technicians|length }} Engineers Active</span></div>
-                        <div class="text-muted" style="font-size: 0.72rem;">Ready for 1-click WhatsApp telecom dispatch</div>
+                        <div class="small fw-bold text-dark mb-0">Field Crew Capacity: <span class="text-dark font-monospace">{{ all_technicians|length }} Active Account(s)</span></div>
+                        <div class="text-muted" style="font-size: 0.72rem;">Assigned dispatch &amp; recovery team</div>
                     </div>
                 </div>
             </div>
@@ -662,7 +692,7 @@
                 <button type="button" class="btn btn-outline-primary fw-semibold" onclick="filterByPriority('In Progress', this)">In Progress</button>
             </div>
             <!-- Log New Complaint Button -->
-            <button type="button" class="btn btn-sm btn-warning text-dark fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#adminNewComplaintModal">
+            <button type="button" class="btn btn-sm btn-orange fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#adminNewComplaintModal">
                 <i class="bi bi-plus-lg me-1"></i> New Complaint
             </button>
         </div>
@@ -815,30 +845,48 @@
         </div>
         <span class="badge bg-light text-dark border fw-bold">{{ all_technicians|length }} Staff Members</span>
     </div>
-    <div class="card-body p-3">
+    <div class="card-body p-3 p-md-4">
         <div class="row g-3">
             {% for tech in all_technicians %}
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="p-3 rounded-3 border bg-light d-flex align-items-center justify-content-between h-100">
-                    <div class="d-flex align-items-center gap-2.5">
-                        <div class="rounded-circle bg-dark text-white d-flex align-items-center justify-content-center fw-bold fs-6 flex-shrink-0" style="width: 40px; height: 40px;">
+                    <div class="d-flex align-items-center gap-3">
+                        {% if tech.avatar_url %}
+                        <img src="{{ tech.avatar_url }}" alt="{{ tech.full_name }}" class="rounded-circle shadow-sm flex-shrink-0" style="width: 42px; height: 42px; object-fit: cover; border: 2px solid #2563eb;">
+                        {% else %}
+                        <div class="rounded-circle bg-dark text-white d-flex align-items-center justify-content-center fw-bold fs-6 flex-shrink-0" style="width: 42px; height: 42px;">
                             {{ tech.full_name[:1] }}
                         </div>
+                        {% endif %}
                         <div>
                             <div class="fw-bold text-dark">{{ tech.full_name }}</div>
                             <div class="small text-muted font-monospace">
-                                <i class="bi bi-telephone me-1 text-primary"></i>{{ tech.phone or 'No phone' }}
+                                <i class="bi bi-telephone me-1 text-primary"></i>{{ tech.phone or 'Phone not set' }}
                             </div>
-                            <span class="badge bg-secondary bg-opacity-20 text-dark border small mt-1" style="font-size: 0.65rem;">
-                                {{ tech.role }}
-                            </span>
+                            <div class="d-flex flex-wrap gap-1 mt-1">
+                                <span class="badge bg-dark text-white" style="font-size: 0.65rem;">{{ tech.role }}</span>
+                                {% if tech.assigned_area %}
+                                <span class="badge bg-white text-dark border" style="font-size: 0.65rem;">{{ tech.assigned_area }}</span>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                     <div>
-                        <a href="https://wa.me/{{ clean_whatsapp_phone(tech.phone) }}" target="_blank" class="btn btn-sm btn-outline-success" title="WhatsApp Tech">
+                        {% if tech.phone %}
+                        <a href="https://wa.me/{{ clean_whatsapp_phone(tech.phone) }}" target="_blank" class="btn btn-sm btn-outline-success" title="WhatsApp">
                             <i class="bi bi-whatsapp"></i>
                         </a>
+                        {% endif %}
                     </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-12">
+                <div class="empty-state-box py-4">
+                    <div class="empty-state-icon"><i class="bi bi-people"></i></div>
+                    <h6 class="fw-bold text-dark">No Field Staff Added Yet</h6>
+                    <p class="text-muted small mb-3">Optional: Add technicians or recovery staff logins anytime under Staff Management.</p>
+                    <a href="{{ url_for('staff_list') }}" class="btn btn-sm btn-outline-orange"><i class="bi bi-person-plus me-1"></i> Manage Staff</a>
                 </div>
             </div>
             {% endfor %}
@@ -940,13 +988,20 @@
                     <div class="mb-3">
                         <label class="form-label fw-bold">Select FTTH Subscriber *</label>
                         <select name="customer_id" class="form-select" required>
+                            {% if all_active_cust_list %}
                             <option value="">-- Choose Customer --</option>
                             {% for c in all_active_cust_list %}
                             <option value="{{ c.id }}">
-                                {{ c.full_name }} (@{{ c.pppoe_username }}) - {{ c.area }} [{{ c.db_box or 'FDB' }}]
+                                {{ c.full_name }} (@{{ c.pppoe_username }}){% if c.area %} - {{ c.area }}{% endif %}{% if c.db_box %} [{{ c.db_box }}]{% endif %}
                             </option>
                             {% endfor %}
+                            {% else %}
+                            <option value="" disabled selected>No active subscribers yet — add a customer first</option>
+                            {% endif %}
                         </select>
+                        {% if not all_active_cust_list %}
+                        <div class="form-text text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>Please <a href="{{ url_for('customers_list') }}" class="fw-bold">add a subscriber</a> before logging a complaint.</div>
+                        {% endif %}
                     </div>
 
                     <div class="mb-3">

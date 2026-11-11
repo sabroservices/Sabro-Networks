@@ -132,8 +132,8 @@
                         <div class="small text-muted text-truncate mt-1" style="max-width: 170px;">{{ c.address }}</div>
                     </td>
                     <td>
-                        <span class="badge bg-dark text-white fw-bold">{{ c.plan_name }}</span>
-                        <div class="small text-muted fw-bold mt-1">{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(c.plan_price) }}/mo</div>
+                        <span class="badge bg-dark text-white fw-bold">{{ c.plan_name or 'No Package' }}</span>
+                        <div class="small text-muted fw-bold mt-1">{% if c.plan_price is not none %}{{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(c.plan_price or 0) }}/mo{% else %}Package unassigned{% endif %}</div>
                     </td>
                     <td>
                         <div class="fw-semibold small text-dark font-monospace">{{ c.expiry_date }}</div>
@@ -210,14 +210,24 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="10" class="text-center py-4 text-muted">
-                        No subscribers found matching your criteria.
+                    <td colspan="10" class="p-0">
+                        <div class="empty-state-box">
+                            <div class="empty-state-icon"><i class="bi bi-people"></i></div>
+                            <h6 class="fw-bold text-dark mb-1">No Subscribers Found</h6>
+                            <p class="text-muted small mb-3">Register your first FTTH subscriber or import from a CSV spreadsheet.</p>
+                            {% if current_user and current_user.role == 'Admin' %}
+                            <button type="button" class="btn btn-sm btn-orange fw-bold px-3" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
+                                <i class="bi bi-person-plus-fill me-1"></i> Add First Subscriber
+                            </button>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+</div>
 
 <!-- ================= CUSTOMER MODALS (OUTSIDE TABLE) ================= -->
 {% for c in customers %}
@@ -227,8 +237,8 @@
                             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                                 <div class="modal-content">
                                     <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
-                                        <h5 class="modal-title fw-bold" class="text-dark">
-                                            <i class="bi bi-person-badge me-2" style="color: #ea580c;"></i> FTTH Subscriber Profile: {{ c.full_name }}
+                                        <h5 class="modal-title fw-bold text-dark">
+                                            <i class="bi bi-person-badge me-2" style="color: #2563eb;"></i> FTTH Subscriber Profile: {{ c.full_name }}
                                         </h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
@@ -282,7 +292,7 @@
                                             </div>
                                             <div class="col-6">
                                                 <div class="text-muted">Package Plan:</div>
-                                                <div class="fw-bold fs-6 text-dark">{{ c.plan_name }} ({{ settings.get('currency', 'PKR') }} {{ c.plan_price }})</div>
+                                                <div class="fw-bold fs-6 text-dark">{{ c.plan_name or 'Unassigned' }} ({{ settings.get('currency', 'PKR') }} {{ "{:,.0f}".format(c.plan_price or 0) }})</div>
                                             </div>
                                             <div class="col-6">
                                                 <div class="text-muted">Sector / Area:</div>
@@ -325,8 +335,8 @@
                                 <div class="modal-content">
                                     <form action="{{ url_for('edit_customer', id=c.id) }}" method="POST">
                                         <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
-                                            <h5 class="modal-title fw-bold" class="text-dark">
-                                                <i class="bi bi-pencil-square me-2" style="color: #ea580c;"></i> Edit Subscriber: {{ c.full_name }}
+                                            <h5 class="modal-title fw-bold text-dark">
+                                                <i class="bi bi-pencil-square me-2" style="color: #2563eb;"></i> Edit Subscriber: {{ c.full_name }}
                                             </h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                         </div>
@@ -365,8 +375,9 @@
                                                     <input type="text" name="fiber_core" class="form-control" value="{{ c.fiber_core or '' }}" placeholder="Core 1 (Blue) / Core 2 (Orange)">
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label fw-bold">Package Plan *</label>
-                                                    <select name="tariff_id" class="form-select" required>
+                                                    <label class="form-label fw-bold">Package Plan</label>
+                                                    <select name="tariff_id" class="form-select">
+                                                        <option value="">-- Unassigned / Assign Later --</option>
                                                         {% for t in tariffs %}
                                                             <option value="{{ t.id }}" {% if c.tariff_id == t.id %}selected{% endif %}>
                                                                 {{ t.name }} ({{ t.speed_mb }} MB) - {{ settings.get('currency', 'PKR') }} {{ t.price }}/mo
@@ -411,7 +422,6 @@
                         {% endif %}
 
 {% endfor %}
-</div>
 
 {% if current_user and current_user.role == 'Admin' %}
 <!-- Add Customer Modal -->
@@ -420,8 +430,8 @@
         <div class="modal-content">
             <form action="{{ url_for('add_customer') }}" method="POST">
                 <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">
-                    <h5 class="modal-title fw-bold" class="text-dark">
-                        <i class="bi bi-person-plus-fill me-2" style="color: #ea580c;"></i> Add New FTTH Subscriber
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi bi-person-plus-fill me-2" style="color: #2563eb;"></i> Add New FTTH Subscriber
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -437,21 +447,27 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">PPPoE Password *</label>
-                            <input type="text" name="password" class="form-control font-monospace" required value="123456">
+                            <input type="text" name="password" class="form-control font-monospace" required placeholder="Enter subscriber PPPoE password">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Phone / WhatsApp Number *</label>
-                            <input type="text" name="phone" class="form-control" required placeholder="0300-1234567">
+                            <input type="text" name="phone" class="form-control" required placeholder="e.g. 03XX-XXXXXXX">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">FTTH Speed Package *</label>
-                            <select name="tariff_id" class="form-select" required>
-                                {% for t in tariffs %}
-                                    <option value="{{ t.id }}" {% if t.speed_mb == 15 %}selected{% endif %}>
-                                        {{ t.name }} ({{ t.speed_mb }} MB) - {{ settings.get('currency', 'PKR') }} {{ t.price }}/month
-                                    </option>
-                                {% endfor %}
+                            <label class="form-label fw-bold">FTTH Speed Package</label>
+                            <select name="tariff_id" class="form-select">
+                                {% if tariffs %}
+                                    <option value="">-- Select Package --</option>
+                                    {% for t in tariffs %}
+                                        <option value="{{ t.id }}">{{ t.name }} ({{ t.speed_mb }} MB) - {{ settings.get('currency', 'PKR') }} {{ t.price }}/month</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="">-- No packages created yet (Optional) --</option>
+                                {% endif %}
                             </select>
+                            {% if not tariffs %}
+                            <div class="form-text small text-muted"><a href="{{ url_for('tariffs_list') }}" class="fw-semibold">Create speed packages</a> to auto-bill monthly.</div>
+                            {% endif %}
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Area / Sector *</label>
@@ -487,7 +503,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">ONU Security Deposit (Optional)</label>
-                            <input type="number" name="onu_deposit" class="form-control" value="2500" placeholder="e.g. 2500">
+                            <input type="number" name="onu_deposit" class="form-control" value="0" placeholder="e.g. 2500">
                             <div class="small text-muted">Will be recorded in Deposits Ledger</div>
                         </div>
                         <div class="col-12">
@@ -503,6 +519,7 @@
             </form>
         </div>
     </div>
+</div>
 
 <!-- Upload & Import Customers CSV Modal -->
 <div class="modal fade" id="uploadCustomersModal" tabindex="-1">
@@ -537,7 +554,6 @@
             </form>
         </div>
     </div>
-</div>
 </div>
 {% endif %}
 {% endblock %}
