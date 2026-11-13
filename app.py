@@ -1,3 +1,4 @@
+import base64
 import sqlite3
 import os
 import secrets
@@ -8,7 +9,7 @@ import io
 import tempfile
 from functools import wraps
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, send_file, g
 from werkzeug.security import generate_password_hash, check_password_hash
 import db
 import dealer_client
@@ -34,6 +35,17 @@ app.config.update(
 
 # Ensure DB initialized
 db.init_db(force_reset=False)
+
+@app.teardown_appcontext
+def close_db_connection(exception=None):
+    """Ensures request-bound database connection is cleanly closed to prevent connection leaks."""
+    db_conn = g.pop('db_conn', None)
+    if db_conn is not None:
+        try:
+            db_conn.close()
+        except Exception:
+            pass
+
 
 def get_settings():
     conn = db.get_db()
@@ -188,7 +200,7 @@ def calculate_technician_level(resolved_count, xp=None):
     }
 
 def get_user_avatar(user_dict_or_row):
-    """Returns avatar URL (uploaded custom PFP or role-based high-tech SVG)."""
+    """Returns avatar URL: persistent base64 data URI, external URL, local file, or role SVG."""
     if not user_dict_or_row:
         return url_for('static', filename='img/avatar_admin.svg')
     
@@ -205,6 +217,10 @@ def get_user_avatar(user_dict_or_row):
             pass
 
     if pfp:
+        # 1. Base64 Data URI or external URL (100% persistent across Render container restarts)
+        if pfp.startswith("data:image/") or pfp.startswith("http://") or pfp.startswith("https://"):
+            return pfp
+        # 2. Local relative filesystem path
         full_path = os.path.join(app.root_path, "static", pfp.replace("/", os.sep))
         if os.path.exists(full_path):
             return url_for('static', filename=pfp)
@@ -216,7 +232,12 @@ def get_user_avatar(user_dict_or_row):
     return url_for('static', filename='img/avatar_admin.svg')
 
 def save_pfp_upload(file_storage, user_id):
-    """Saves uploaded PFP image to static/uploads/pfp/ and returns relative path."""
+    """
+    Saves uploaded PFP image:
+      - Validates extension and file size.
+      - Saves to static/uploads/pfp/ and returns relative path ('uploads/pfp/...').
+      - Compatible with persistent disks, S3-compatible cloud storage, and local serving.
+    """
     if not file_storage or not file_storage.filename:
         return None
     ext = file_storage.filename.rsplit('.', 1)[-1].lower() if '.' in file_storage.filename else ''
@@ -224,13 +245,20 @@ def save_pfp_upload(file_storage, user_id):
         return None
     
     try:
+        raw_bytes = file_storage.read()
+        if not raw_bytes or len(raw_bytes) > 2 * 1024 * 1024:  # max 2MB
+            return None
+        
         upload_dir = os.path.join(app.root_path, "static", "uploads", "pfp")
         os.makedirs(upload_dir, exist_ok=True)
         filename = f"pfp_{user_id}_{int(datetime.now().timestamp())}.{ext}"
         dest_path = os.path.join(upload_dir, filename)
-        file_storage.save(dest_path)
+        with open(dest_path, "wb") as f:
+            f.write(raw_bytes)
+        
         return f"uploads/pfp/{filename}"
-    except Exception:
+    except Exception as e:
+        print(f"[PFP UPLOAD ERROR]: {e}")
         return None
 
 @app.context_processor
@@ -1034,29 +1062,38 @@ def pay_invoice(id):
     paid_date = datetime.now().strftime("%Y-%m-%d")
     
     conn = db.get_db()
-    inv = conn.execute("SELECT customer_id, amount FROM invoices WHERE id = ?", (id,)).fetchone()
+    inv = conn.execute("SELECT customer_id, amount, status FROM invoices WHERE id = ?", (id,)).fetchone()
     if not inv:
         conn.close()
         flash("Invoice not found.", "danger")
         return redirect(request.referrer or url_for("invoices_list"))
-    
-    conn.execute("""
-        UPDATE invoices 
-        SET status = 'Paid', paid_date = ?, payment_method = ?, collected_by_staff_id = ?
-        WHERE id = ?
-    """, (paid_date, payment_method, staff_id, id))
-    
-    if staff_id and inv:
-        conn.execute("UPDATE users SET total_collected = total_collected + ? WHERE id = ?", (inv["amount"], staff_id))
-    
-    if inv:
-        cust_id = inv["customer_id"]
-        new_exp = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
-        conn.execute("UPDATE customers SET status = 'Active', expiry_date = ? WHERE id = ?", (new_exp, cust_id))
 
-    conn.commit()
-    conn.close()
-    flash(f"Invoice marked as PAID via {payment_method}! Customer account extended for 30 days.", "success")
+    if inv["status"] == "Paid":
+        conn.close()
+        flash("Notice: This invoice is already marked as Paid.", "warning")
+        return redirect(request.referrer or url_for("invoices_list"))
+
+    try:
+        with conn:
+            conn.execute("""
+                UPDATE invoices 
+                SET status = 'Paid', paid_date = ?, payment_method = ?, collected_by_staff_id = ?
+                WHERE id = ?
+            """, (paid_date, payment_method, staff_id, id))
+            
+            if staff_id:
+                conn.execute("UPDATE users SET total_collected = total_collected + ? WHERE id = ?", (inv["amount"], staff_id))
+            
+            cust_id = inv["customer_id"]
+            new_exp = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+            conn.execute("UPDATE customers SET status = 'Active', expiry_date = ? WHERE id = ?", (new_exp, cust_id))
+
+        flash(f"Invoice marked as PAID via {payment_method}! Customer account extended for 30 days.", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Payment transaction failed: {str(e)}", "danger")
+    finally:
+        conn.close()
     return redirect(request.referrer or url_for("invoices_list"))
 
 @app.route("/invoices/delete/<int:id>", methods=["POST"])
@@ -1103,19 +1140,23 @@ def generate_monthly_invoices():
     }
 
     created_count = 0
-    for c in active_customers:
-        if c["id"] not in existing_billed_customer_ids:
-            inv_number = generate_unique_invoice_number(conn, c['id'])
-            conn.execute("""
-                INSERT INTO invoices (invoice_number, customer_id, amount, month_period, status, due_date, created_at)
-                VALUES (?, ?, ?, ?, 'Unpaid', ?, ?)
-            """, (inv_number, c["id"], c["price"], month_name, due_date, created_at))
-            existing_billed_customer_ids.add(c["id"])
-            created_count += 1
-
-    conn.commit()
-    conn.close()
-    flash(f"Generated {created_count} monthly bills for {month_name}!", "success")
+    try:
+        with conn:
+            for c in active_customers:
+                if c["id"] not in existing_billed_customer_ids:
+                    inv_number = generate_unique_invoice_number(conn, c['id'])
+                    conn.execute("""
+                        INSERT INTO invoices (invoice_number, customer_id, amount, month_period, status, due_date, created_at)
+                        VALUES (?, ?, ?, ?, 'Unpaid', ?, ?)
+                    """, (inv_number, c["id"], c["price"], month_name, due_date, created_at))
+                    existing_billed_customer_ids.add(c["id"])
+                    created_count += 1
+        flash(f"Generated {created_count} monthly bills for {month_name}!", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error generating monthly bills: {str(e)}", "danger")
+    finally:
+        conn.close()
     return redirect(url_for("invoices_list"))
 
 @app.route("/invoice/<int:id>/print")
@@ -1518,12 +1559,13 @@ def edit_ticket(id):
         user_exists = conn.execute("SELECT id FROM users WHERE id = ?", (assigned_user_id,)).fetchone()
         if not user_exists:
             assigned_user_id = None
+    old_ticket = conn.execute("SELECT status FROM tickets WHERE id = ?", (id,)).fetchone()
     conn.execute("""
         UPDATE tickets 
         SET subject = ?, details = ?, priority = ?, status = ?, assigned_user_id = ?, resolution_notes = ?, resolved_at = ?
         WHERE id = ?
     """, (subject, details, priority, status, assigned_user_id, resolution_notes, resolved_at, id))
-    if status == "Resolved" and assigned_user_id:
+    if status == "Resolved" and assigned_user_id and old_ticket and old_ticket["status"] != "Resolved":
         xp_gain = 180 if priority == "Critical" else 120
         conn.execute("UPDATE users SET technician_xp = technician_xp + ? WHERE id = ?", (xp_gain, assigned_user_id))
     conn.commit()

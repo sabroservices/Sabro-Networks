@@ -32,4 +32,4 @@ jobs:
 
     - name: Execute Full Test Suite
       run: |
-        python -m unittest test_security_suite.py test_enterprise_suite.py test_company_system.py
+        python -m unittest test_security_suite.py test_enterprise_suite.py test_company_system.py test_persistence.py test_turso_db_suite.py test_production_lifecycle_suite.py

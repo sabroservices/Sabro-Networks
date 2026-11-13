@@ -12,5 +12,11 @@ services:
         value: 3.11.9
       - key: FLASK_ENV
         value: production
+      - key: DATABASE_BACKEND
+        value: turso
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
       - key: SECRET_KEY
         generateValue: true
