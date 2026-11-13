@@ -402,6 +402,7 @@ def logout():
     return redirect(url_for("login"))
 
 # ================= DASHBOARD =================
+@app.route("/dashboard")
 @app.route("/")
 def dashboard():
     user_id = session.get("user_id")
