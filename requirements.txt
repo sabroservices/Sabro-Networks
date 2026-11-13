@@ -3,3 +3,4 @@ Werkzeug>=2.3.0
 requests>=2.28.0
 waitress>=2.1.2
 gunicorn>=21.0.0
+libsql-client>=0.3.0

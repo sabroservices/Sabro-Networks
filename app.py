@@ -2243,7 +2243,9 @@ def settings_page():
         return redirect(url_for("settings_page"))
 
     conn.close()
-    return render_template("settings.html")
+    storage_engine = db.get_storage_engine_name()
+    is_turso = db.is_turso()
+    return render_template("settings.html", storage_engine=storage_engine, is_turso=is_turso)
 
 # ================= DATABASE BACKUP DOWNLOAD =================
 @app.route("/backup/db")
@@ -2445,11 +2447,26 @@ def restore_db():
             return redirect(url_for("settings_page"))
         
         # Safely restore into active database
-        dest_conn = sqlite3.connect(db.DB_PATH, timeout=15.0)
-        src_conn = sqlite3.connect(temp_restored)
-        src_conn.backup(dest_conn)
-        src_conn.close()
-        dest_conn.close()
+        if db.is_turso():
+            src_conn = sqlite3.connect(temp_restored)
+            turso_conn = db.get_db()
+            tables = [r[0] for r in src_conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()]
+            for table in tables:
+                turso_conn.execute(f"DELETE FROM {table};")
+                rows = src_conn.execute(f"SELECT * FROM {table};").fetchall()
+                if rows:
+                    cols = [col[1] for col in src_conn.execute(f"PRAGMA table_info({table})").fetchall()]
+                    placeholders = ", ".join(["?"] * len(cols))
+                    for r in rows:
+                        turso_conn.execute(f"INSERT OR REPLACE INTO {table} ({', '.join(cols)}) VALUES ({placeholders})", list(r))
+            turso_conn.close()
+            src_conn.close()
+        else:
+            dest_conn = sqlite3.connect(db.DB_PATH, timeout=15.0)
+            src_conn = sqlite3.connect(temp_restored)
+            src_conn.backup(dest_conn)
+            src_conn.close()
+            dest_conn.close()
         
         try:
             os.remove(temp_restored)
@@ -2579,14 +2596,14 @@ def page_not_found(e):
     try:
         return render_template("404.html"), 404
     except Exception:
-        return "<h1>404 - Page Not Found</h1><p>Sabro Networks NOC Portal</p>", 404
+        return """<!DOCTYPE html><html><head><meta charset="utf-8"><title>404 Not Found | Sabro Networks</title><style>body{background:#0b0f19;color:#f3f4f6;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}div{background:#111827;border:1px solid #1f2937;padding:40px;border-radius:12px;text-align:center;max-width:480px;}h1{color:#60a5fa;margin:0 0 10px;}p{color:#9ca3af;margin-bottom:20px;}a{background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;}</style></head><body><div><h1>404</h1><h3>Page Not Found</h3><p>The requested endpoint does not exist.</p><a href="/dashboard">Back to Dashboard</a></div></body></html>""", 404
 
 @app.errorhandler(500)
 def internal_server_error(e):
     try:
         return render_template("500.html"), 500
     except Exception:
-        return f"<h1>500 - Internal Server Error</h1><p>{str(e)}</p>", 500
+        return """<!DOCTYPE html><html><head><meta charset="utf-8"><title>500 Server Notice | Sabro Networks</title><style>body{background:#0b0f19;color:#f3f4f6;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}div{background:#111827;border:1px solid #1f2937;padding:40px;border-radius:12px;text-align:center;max-width:480px;}h1{color:#ef4444;margin:0 0 10px;}p{color:#9ca3af;margin-bottom:20px;}a{background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;}</style></head><body><div><h1>500</h1><h3>Temporary System Notice</h3><p>The server encountered a temporary condition. Data remains protected.</p><a href="/dashboard">Back to Dashboard</a></div></body></html>""", 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

@@ -2,6 +2,10 @@ import sqlite3
 import os
 from werkzeug.security import generate_password_hash
 
+# Detect Turso / libSQL Cloud Database Configuration
+TURSO_DATABASE_URL = os.environ.get("TURSO_DATABASE_URL", "").strip()
+TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "").strip()
+
 # Detect serverless execution environment (e.g., Vercel, AWS Lambda)
 is_serverless = os.environ.get("VERCEL") == "1" or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") is not None
 if is_serverless:
@@ -9,7 +13,139 @@ if is_serverless:
 else:
     DB_PATH = os.environ.get("SABRO_DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "sabro_isp.db"))
 
+
+def is_turso():
+    return bool(TURSO_DATABASE_URL)
+
+
+def get_storage_engine_name():
+    if is_turso():
+        return "Turso Cloud SQLite (Persistent Across Restarts)"
+    if os.environ.get("SABRO_DB_PATH"):
+        return f"Persistent Mounted Disk ({DB_PATH})"
+    return "Local SQLite Storage (sabro_isp.db)"
+
+
+# ================= TURSO / LIBSQL ADAPTER =================
+class LibsqlRow:
+    """Provides sqlite3.Row compatible dictionary-like and integer indexing for libSQL results."""
+    def __init__(self, cols, values):
+        self._cols = {c: i for i, c in enumerate(cols)}
+        self._values = list(values)
+
+    def __getitem__(self, item):
+        if isinstance(item, int):
+            return self._values[item]
+        if item not in self._cols:
+            raise KeyError(item)
+        return self._values[self._cols[item]]
+
+    def keys(self):
+        return list(self._cols.keys())
+
+    def get(self, key, default=None):
+        if key in self._cols:
+            return self._values[self._cols[key]]
+        return default
+
+    def __contains__(self, key):
+        return key in self._cols
+
+    def __repr__(self):
+        return str(dict(zip(self._cols.keys(), self._values)))
+
+
+class LibsqlCursor:
+    """Provides sqlite3.Cursor compatible interface wrapping libSQL Client."""
+    def __init__(self, client):
+        self.client = client
+        self.lastrowid = None
+        self.rowcount = 0
+        self._rows = []
+        self._idx = 0
+
+    def execute(self, sql, params=None):
+        p = list(params) if params is not None else []
+        res = self.client.execute(sql, p)
+        self.lastrowid = getattr(res, "last_insert_rowid", None)
+        self.rowcount = getattr(res, "rows_affected", 0)
+        self._rows = [LibsqlRow(res.columns, r) for r in res.rows]
+        self._idx = 0
+        return self
+
+    def executemany(self, sql, seq_of_params):
+        for p in seq_of_params:
+            self.execute(sql, p)
+        return self
+
+    def fetchone(self):
+        if self._idx < len(self._rows):
+            r = self._rows[self._idx]
+            self._idx += 1
+            return r
+        return None
+
+    def fetchall(self):
+        r = self._rows[self._idx:]
+        self._idx = len(self._rows)
+        return r
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        r = self.fetchone()
+        if r is None:
+            raise StopIteration
+        return r
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
+class LibsqlConn:
+    """Provides sqlite3.Connection compatible interface for Turso libSQL Cloud."""
+    def __init__(self, url, auth_token=None):
+        import libsql_client
+        self.client = libsql_client.create_client_sync(url, auth_token=auth_token)
+
+    def cursor(self):
+        return LibsqlCursor(self.client)
+
+    def execute(self, sql, params=None):
+        cur = self.cursor()
+        return cur.execute(sql, params)
+
+    def commit(self):
+        # libSQL auto-commits operations
+        pass
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        try:
+            self.client.close()
+        except Exception:
+            pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
 def get_db():
+    if is_turso():
+        try:
+            return LibsqlConn(TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
+        except Exception as e:
+            print(f"[TURSO ERROR] Falling back to local SQLite: {e}")
+
     conn = sqlite3.connect(DB_PATH, timeout=25.0)
     conn.row_factory = sqlite3.Row
     # Enable WAL mode if supported, fallback to DELETE mode on restricted serverless filesystems
@@ -27,18 +163,45 @@ def get_db():
         pass
     return conn
 
+
 def safe_backup_to_file(dest_path):
-    """Safely creates an atomic, consistent database backup using SQLite backup API."""
-    source_conn = get_db()
-    dest_conn = sqlite3.connect(dest_path)
-    with dest_conn:
-        source_conn.backup(dest_conn)
-    dest_conn.close()
-    source_conn.close()
-    return dest_path
+    """Safely creates an atomic, consistent database backup using SQLite backup API or schema dump."""
+    if is_turso():
+        source_conn = get_db()
+        dest_conn = sqlite3.connect(dest_path)
+        tables = [
+            r[0] for r in source_conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            ).fetchall()
+        ]
+        for table in tables:
+            row = source_conn.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name = ?", (table,)
+            ).fetchone()
+            if row and row[0]:
+                dest_conn.execute(row[0])
+                rows = source_conn.execute(f"SELECT * FROM {table}").fetchall()
+                if rows:
+                    cols = rows[0].keys()
+                    placeholders = ", ".join(["?"] * len(cols))
+                    insert_sql = f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({placeholders})"
+                    dest_conn.executemany(insert_sql, [[r[c] for c in cols] for r in rows])
+        dest_conn.commit()
+        dest_conn.close()
+        source_conn.close()
+        return dest_path
+    else:
+        source_conn = get_db()
+        dest_conn = sqlite3.connect(dest_path)
+        with dest_conn:
+            source_conn.backup(dest_conn)
+        dest_conn.close()
+        source_conn.close()
+        return dest_path
+
 
 def init_db(force_reset=False):
-    if force_reset and os.path.exists(DB_PATH):
+    if force_reset and not is_turso() and os.path.exists(DB_PATH):
         try:
             os.remove(DB_PATH)
         except Exception:

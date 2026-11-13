@@ -128,16 +128,52 @@
             </div>
         </form>
 
-        <!-- Database Safety & Offline Backup Card -->
-        <div class="table-card p-4 mb-4">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <!-- Database Storage Engine & Persistence Status -->
+        <div class="table-card p-4 mb-4 border {% if is_turso %}border-success{% else %}border-warning{% endif %}">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
                 <div>
                     <h5 class="fw-bold mb-1 text-dark">
-                        <i class="bi bi-database-fill-down me-2" style="color: #2563eb;"></i> Database Safety & Offline Backup
+                        <i class="bi bi-hdd-network-fill me-2" style="color: {% if is_turso %}#10b981{% else %}#f59e0b{% endif %};"></i>
+                        Storage Engine & Persistence Status
                     </h5>
                     <p class="text-muted small mb-0">
-                        Download a complete timestamped copy of your SQLite database or restore a verified backup file.
+                        Active Database Backend: <strong>{{ storage_engine or 'Local SQLite' }}</strong>
                     </p>
+                </div>
+                <div>
+                    {% if is_turso %}
+                    <span class="badge bg-success px-3 py-2 fs-6 shadow-sm">
+                        <i class="bi bi-shield-check me-1"></i> Cloud Persistent (Zero Data Loss)
+                    </span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark px-3 py-2 fs-6 shadow-sm">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Local Storage (Render Free Tier Ephemeral)
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if not is_turso %}
+            <div class="alert alert-warning mb-3 p-3 rounded-3" style="font-size: 0.85rem; border-left: 4px solid #f59e0b;">
+                <div class="fw-bold mb-1"><i class="bi bi-info-circle-fill me-1"></i> Why data disappears on Render Free Tier:</div>
+                Render's free web containers restart after 15 minutes of inactivity and wipe local files. 
+                To make your subscriber & billing data <strong>100% permanent across all restarts without paying anything</strong>:
+                <ol class="mb-2 mt-1 ps-3">
+                    <li>Create a free database at <a href="https://turso.tech" target="_blank" class="fw-bold text-decoration-underline">turso.tech</a> (100% Free Forever, no credit card).</li>
+                    <li>In your Render Dashboard &rarr; <strong>Environment</strong>, add:
+                        <ul class="mb-0 mt-1">
+                            <li><code>TURSO_DATABASE_URL</code> = <code>libsql://your-db-name.turso.io</code></li>
+                            <li><code>TURSO_AUTH_TOKEN</code> = <code>your-database-token</code></li>
+                        </ul>
+                    </li>
+                </ol>
+                Alternatively, you can download backups anytime below and restore them with 1 click.
+            </div>
+            {% endif %}
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center pt-2 border-top gap-2">
+                <div>
+                    <span class="small text-muted">Point-in-time binary snapshot & restoration system:</span>
                 </div>
                 <div class="d-flex gap-2">
                     <a href="{{ url_for('backup_db') }}" class="btn btn-success fw-bold px-3 py-2 shadow-sm">
