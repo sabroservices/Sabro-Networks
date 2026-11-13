@@ -28,9 +28,12 @@ else:
 
 def is_turso():
     """Returns True if the active database backend is configured for Turso Cloud with valid URL and token."""
-    if DATABASE_BACKEND == "sqlite":
+    backend = os.environ.get("DATABASE_BACKEND", DATABASE_BACKEND).lower().strip()
+    url = os.environ.get("TURSO_DATABASE_URL", TURSO_DATABASE_URL).strip()
+    token = os.environ.get("TURSO_AUTH_TOKEN", TURSO_AUTH_TOKEN).strip()
+    if backend == "sqlite":
         return False
-    return bool(TURSO_DATABASE_URL and TURSO_AUTH_TOKEN)
+    return bool(url and token)
 
 
 def validate_production_config():
@@ -39,8 +42,11 @@ def validate_production_config():
     If DATABASE_BACKEND is explicitly set to 'turso', enforces that credentials are present.
     If running in production without Turso credentials, logs an operational persistence warning without crashing the server.
     """
-    if DATABASE_BACKEND == "turso":
-        if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
+    backend = os.environ.get("DATABASE_BACKEND", DATABASE_BACKEND).lower().strip()
+    url = os.environ.get("TURSO_DATABASE_URL", TURSO_DATABASE_URL).strip()
+    token = os.environ.get("TURSO_AUTH_TOKEN", TURSO_AUTH_TOKEN).strip()
+    if backend == "turso":
+        if not url or not token:
             raise RuntimeError(
                 "CRITICAL CONFIGURATION ERROR: Production requires persistent Turso Cloud database.\n"
                 "DATABASE_BACKEND is set to 'turso', but TURSO_DATABASE_URL "
@@ -60,7 +66,8 @@ def validate_production_config():
 def get_storage_engine_name():
     """Returns human-readable name of the active storage engine for UI diagnostics."""
     if is_turso():
-        masked_url = re.sub(r"://([^@]+)@", "://***@", TURSO_DATABASE_URL) if "@" in TURSO_DATABASE_URL else TURSO_DATABASE_URL
+        url = os.environ.get("TURSO_DATABASE_URL", TURSO_DATABASE_URL).strip()
+        masked_url = re.sub(r"://([^@]+)@", "://***@", url) if "@" in url else url
         return f"Turso Cloud SQLite ({masked_url})"
     if os.environ.get("SABRO_DB_PATH"):
         return f"Persistent Mounted Disk ({DB_PATH})"
@@ -205,6 +212,16 @@ class LibsqlConn:
     """
     def __init__(self, url, auth_token=None):
         import libsql_client
+        if url:
+            url_str = str(url).strip()
+            if url_str.startswith("libsql://"):
+                url = "https://" + url_str[len("libsql://"):]
+            elif url_str.startswith("wss://"):
+                url = "https://" + url_str[len("wss://"):]
+            elif url_str.startswith("ws://"):
+                url = "http://" + url_str[len("ws://"):]
+            else:
+                url = url_str
         self.client = libsql_client.create_client_sync(url, auth_token=auth_token)
         self._txn = None
         self.row_factory = LibsqlRow  # compatibility marker
@@ -279,12 +296,14 @@ def get_db():
     validate_production_config()
 
     if is_turso():
+        url = os.environ.get("TURSO_DATABASE_URL", TURSO_DATABASE_URL).strip()
+        token = os.environ.get("TURSO_AUTH_TOKEN", TURSO_AUTH_TOKEN).strip()
         try:
-            return LibsqlConn(TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
+            return LibsqlConn(url, auth_token=token)
         except Exception as e:
-            if IS_PRODUCTION or DATABASE_BACKEND == "turso":
+            if IS_PRODUCTION or os.environ.get("DATABASE_BACKEND", DATABASE_BACKEND) == "turso":
                 raise RuntimeError(
-                    f"CRITICAL: Failed to connect to Turso Cloud database ({TURSO_DATABASE_URL}): {e}.\n"
+                    f"CRITICAL: Failed to connect to Turso Cloud database ({url}): {e}.\n"
                     "Ephemeral SQLite fallback is strictly blocked in production to prevent data loss."
                 ) from e
             print(f"[TURSO WARNING] Local development fallback to SQLite due to connection error: {e}")
