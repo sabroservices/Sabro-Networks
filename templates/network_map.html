@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block page_title %}Optical Network GIS Map{% endblock %}
+
+{% block extra_head %}
+<!-- Leaflet CSS ($0 Open-Source GIS Map) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #gisMap {
+        width: 100%;
+        height: calc(100vh - 240px);
+        min-height: 520px;
+        border-radius: 12px;
+        z-index: 1;
+    }
+    .map-legend {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 10px 14px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        font-size: 0.82rem;
+        line-height: 1.6;
+    }
+    .legend-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 6px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-3 align-items-center">
+    <div class="col-md-6">
+        <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-geo-alt-fill text-danger me-2"></i> FTTH Infrastructure & Subscriber GIS Map</h5>
+        <div class="text-muted small">OpenStreetMap Real-time Topology & Fiber Route Mapping ($0 Free-Tier Architecture)</div>
+    </div>
+    <div class="col-md-6 text-md-end">
+        <div class="d-inline-flex gap-2">
+            <span class="badge bg-primary px-3 py-2"><i class="bi bi-hdd-rack me-1"></i> {{ olts|length }} OLTs</span>
+            <span class="badge bg-warning text-dark px-3 py-2"><i class="bi bi-share me-1"></i> {{ splitters|length }} Splitters (FDB)</span>
+            <span class="badge bg-success px-3 py-2"><i class="bi bi-people me-1"></i> {{ customers|length }} Subscribers</span>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-3 table-card p-2 mb-4">
+    <div id="gisMap"></div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Default center (Karachi / Hub Baluchistan region default if items don't have coords)
+    let defaultLat = 24.8607;
+    let defaultLng = 67.0011;
+    let zoomLevel = 13;
+
+    const map = L.map('gisMap').setView([defaultLat, defaultLng], zoomLevel);
+
+    // Free OpenStreetMap Tile Layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    const bounds = [];
+
+    // OLT Icon
+    const oltIcon = L.divIcon({
+        className: 'custom-map-icon',
+        html: '<div style="background:#2563eb; color:#fff; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 0 10px rgba(37,99,235,0.6); border:2px solid #fff;"><i class="bi bi-hdd-rack" style="font-size:16px;"></i></div>',
+        iconSize: [34, 34],
+        iconAnchor: [17, 17]
+    });
+
+    // Splitter Icon
+    const splitterIcon = L.divIcon({
+        className: 'custom-map-icon',
+        html: '<div style="background:#ea580c; color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 0 8px rgba(234,88,12,0.6); border:2px solid #fff;"><i class="bi bi-share" style="font-size:14px;"></i></div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+    });
+
+    // Customer Active Icon
+    const custActiveIcon = L.divIcon({
+        className: 'custom-map-icon',
+        html: '<div style="background:#16a34a; color:#fff; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 0 6px rgba(22,163,74,0.6); border:2px solid #fff;"><i class="bi bi-person-fill" style="font-size:12px;"></i></div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+
+    // Customer Expired / Suspended Icon
+    const custOfflineIcon = L.divIcon({
+        className: 'custom-map-icon',
+        html: '<div style="background:#dc2626; color:#fff; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 0 6px rgba(220,38,38,0.6); border:2px solid #fff;"><i class="bi bi-person-fill" style="font-size:12px;"></i></div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+
+    // 1. Render Splitters
+    {% for sp in splitters %}
+        {% if sp.lat and sp.lng and sp.lat != 0.0 %}
+            const markerSp{{ sp.id }} = L.marker([{{ sp.lat }}, {{ sp.lng }}], { icon: splitterIcon }).addTo(map);
+            markerSp{{ sp.id }}.bindPopup(`
+                <div style="min-width: 180px;">
+                    <div class="fw-bold text-dark"><i class="bi bi-share text-warning me-1"></i> {{ sp.name }}</div>
+                    <div class="small text-muted mb-1">{{ sp.location or 'FDB Distribution Point' }}</div>
+                    <div class="small">Ratio: <strong class="badge bg-secondary">{{ sp.ratio }}</strong></div>
+                    <div class="small">Ports: <strong>{{ sp.used_ports }}/{{ sp.max_ports }}</strong></div>
+                </div>
+            `);
+            bounds.push([{{ sp.lat }}, {{ sp.lng }}]);
+        {% endif %}
+    {% endfor %}
+
+    // 2. Render Subscribers
+    {% for c in customers %}
+        {% if c.lat and c.lng and c.lat != 0.0 %}
+            const iconC{{ c.id }} = {% if c.status == 'Active' %} custActiveIcon {% else %} custOfflineIcon {% endif %};
+            const markerC{{ c.id }} = L.marker([{{ c.lat }}, {{ c.lng }}], { icon: iconC{{ c.id }} }).addTo(map);
+            markerC{{ c.id }}.bindPopup(`
+                <div style="min-width: 200px;">
+                    <div class="fw-bold text-primary mb-0">{{ c.full_name }}</div>
+                    <div class="font-monospace small text-muted mb-2">@{{ c.pppoe_username }} &bull; {{ c.phone or '' }}</div>
+                    <div class="small mb-1">Status: <span class="badge {% if c.status == 'Active' %}bg-success{% else %}bg-danger{% endif %}">{{ c.status }}</span></div>
+                    <div class="small mb-1">FDB Box: <strong>{{ c.db_box or 'Unassigned' }}</strong></div>
+                    <div class="small mb-2">Core: <strong>{{ c.fiber_core or 'Blue' }}</strong></div>
+                    <a href="/customers/{{ c.id }}/view" class="btn btn-sm btn-primary py-0 px-2 w-100" style="font-size:0.75rem;">
+                        View 360° Profile
+                    </a>
+                </div>
+            `);
+            bounds.push([{{ c.lat }}, {{ c.lng }}]);
+        {% endif %}
+    {% endfor %}
+
+    if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [40, 40] });
+    }
+
+    // Custom Map Legend
+    const legend = L.control({ position: 'bottomright' });
+    legend.onAdd = function() {
+        const div = L.DomUtil.create('div', 'map-legend');
+        div.innerHTML = `
+            <div class="fw-bold mb-1 border-bottom pb-1">Network Legend</div>
+            <div><span class="legend-dot" style="background:#2563eb;"></span> Central OLT Node</div>
+            <div><span class="legend-dot" style="background:#ea580c;"></span> Splitter / FDB Box</div>
+            <div><span class="legend-dot" style="background:#16a34a;"></span> Active Subscriber</div>
+            <div><span class="legend-dot" style="background:#dc2626;"></span> Expired / Suspended</div>
+        `;
+        return div;
+    };
+    legend.addTo(map);
+});
+</script>
+{% endblock %}

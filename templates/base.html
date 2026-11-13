@@ -581,6 +581,26 @@
                     <a href="{{ url_for('settings_page') }}" class="nav-link {% if request.endpoint == 'settings_page' %}active{% endif %}">
                         <i class="bi bi-gear-fill"></i> Business WhatsApp & Info
                     </a>
+
+                    <div class="nav-category">Optical Network & GIS</div>
+                    <a href="{{ url_for('ftth_topology_page') }}" class="nav-link {% if request.endpoint == 'ftth_topology_page' %}active{% endif %}">
+                        <i class="bi bi-diagram-2"></i> Optical Topology & OLT
+                    </a>
+                    <a href="{{ url_for('network_map_page') }}" class="nav-link {% if request.endpoint == 'network_map_page' %}active{% endif %}">
+                        <i class="bi bi-geo-alt"></i> Network GIS Map
+                    </a>
+                    <a href="{{ url_for('routers_page') }}" class="nav-link {% if request.endpoint == 'routers_page' %}active{% endif %}">
+                        <i class="bi bi-hdd-network"></i> Router Gateways
+                    </a>
+                    <a href="{{ url_for('inventory_page') }}" class="nav-link {% if request.endpoint == 'inventory_page' %}active{% endif %}">
+                        <i class="bi bi-box-seam"></i> Optical Inventory
+                    </a>
+                    <a href="{{ url_for('installations_page') }}" class="nav-link {% if request.endpoint == 'installations_page' %}active{% endif %}">
+                        <i class="bi bi-tools"></i> Field Installations
+                    </a>
+                    <a href="{{ url_for('cashbook_page') }}" class="nav-link {% if request.endpoint == 'cashbook_page' %}active{% endif %}">
+                        <i class="bi bi-journal-text"></i> Financial Cashbook
+                    </a>
                 {% endif %}
             </div>
         </div>

@@ -3,6 +3,8 @@ import io
 import os
 import sqlite3
 import csv
+import tempfile
+import shutil
 from datetime import datetime, timedelta
 import db
 import app as flask_app
@@ -10,18 +12,33 @@ import app as flask_app
 class SabroNetworksCRUDAndUploadLifecycleTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls._orig_db_path = db.DB_PATH
+        cls._tmp_dir = tempfile.mkdtemp(prefix="sabro_crud_test_")
+        db.DB_PATH = os.path.join(cls._tmp_dir, "crud_test.db")
+        db.init_db(force_reset=True)
+
         flask_app.app.config['TESTING'] = True
         flask_app.app.config['WTF_CSRF_ENABLED'] = False
         cls.client = flask_app.app.test_client()
 
         conn = db.get_db()
-        admin = conn.execute("SELECT id, username, password, full_name FROM users WHERE role = 'Admin' LIMIT 1").fetchone()
+        conn.execute("INSERT OR IGNORE INTO tariffs (id, name, speed_mb, price, description) VALUES (1, '10 MB FTTH', 10, 1000, 'Standard')")
+        conn.execute("""
+            INSERT OR IGNORE INTO users (full_name, username, password, role, phone, assigned_area, status, total_collected, created_at)
+            VALUES ('Field Tech', 'field.tech', 'tech123', 'Complaint Boy', '0300-1234567', 'Sector A', 'Active', 0.0, date('now'))
+        """)
         tech = conn.execute("SELECT id, username, password, full_name FROM users WHERE role = 'Complaint Boy' LIMIT 1").fetchone()
+        conn.commit()
         conn.close()
         
-        cls.admin_user = admin["username"]
-        cls.admin_pass = admin["password"]
+        cls.admin_user = "ahmedbaloch"
+        cls.admin_pass = "adminadmin1"
         cls.tech_id = tech["id"]
+
+    @classmethod
+    def tearDownClass(cls):
+        db.DB_PATH = cls._orig_db_path
+        shutil.rmtree(cls._tmp_dir, ignore_errors=True)
 
     def login_admin(self):
         res = self.client.post("/login", data={"username": self.admin_user, "password": self.admin_pass}, follow_redirects=True)

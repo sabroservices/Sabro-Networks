@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block page_title %}Field Operations & Installation Workflows{% endblock %}
+
+{% block content %}
+<!-- Top Metrics Row -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-3 table-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">Scheduled</div>
+                    <h3 class="fw-bold mb-0 text-primary">{{ scheduled_count }}</h3>
+                </div>
+                <div class="rounded-circle bg-primary bg-opacity-10 p-3 text-primary fs-4">
+                    <i class="bi bi-calendar-event"></i>
+                </div>
+            </div>
+            <div class="small text-muted mt-2">Pending Technician Dispatch</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-3 table-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">In Progress</div>
+                    <h3 class="fw-bold mb-0 text-warning">{{ in_progress_count }}</h3>
+                </div>
+                <div class="rounded-circle bg-warning bg-opacity-10 p-3 text-warning fs-4">
+                    <i class="bi bi-tools"></i>
+                </div>
+            </div>
+            <div class="small text-muted mt-2">Drop Cable & Splicing Active</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-3 table-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">Completed</div>
+                    <h3 class="fw-bold mb-0 text-success">{{ completed_count }}</h3>
+                </div>
+                <div class="rounded-circle bg-success bg-opacity-10 p-3 text-success fs-4">
+                    <i class="bi bi-check2-circle"></i>
+                </div>
+            </div>
+            <div class="small text-muted mt-2">Activated FTTH Subscribers</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-3 table-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">Total Workflows</div>
+                    <h3 class="fw-bold mb-0 text-info">{{ installations|length }}</h3>
+                </div>
+                <div class="rounded-circle bg-info bg-opacity-10 p-3 text-info fs-4">
+                    <i class="bi bi-clipboard2-check"></i>
+                </div>
+            </div>
+            <div class="small text-muted mt-2">All Connection Work Orders</div>
+        </div>
+    </div>
+</div>
+
+<!-- Installations List -->
+<div class="card border-0 shadow-sm rounded-3 table-card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-bold"><i class="bi bi-tools text-primary me-2"></i> Field Installation Work Orders</span>
+        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#newInstallModal">
+            <i class="bi bi-plus-lg me-1"></i> New Installation Ticket
+        </button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light small">
+                <tr>
+                    <th>Order #</th>
+                    <th>Customer Name & Area</th>
+                    <th>Assigned Technician</th>
+                    <th>Scheduled Date</th>
+                    <th>Drop Cable</th>
+                    <th>Optical Power</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if installations %}
+                    {% for inst in installations %}
+                    <tr>
+                        <td class="font-monospace fw-bold">#INST-{{ "%04d"|format(inst.id) }}</td>
+                        <td>
+                            <div class="fw-bold text-dark">{{ inst.customer_name }}</div>
+                            <div class="small text-muted">@{{ inst.pppoe_username }} &bull; {{ inst.area or 'Area Unassigned' }} &bull; {{ inst.phone or '' }}</div>
+                        </td>
+                        <td>
+                            {% if inst.tech_name %}
+                                <span class="badge bg-light text-dark border"><i class="bi bi-person me-1"></i> {{ inst.tech_name }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-muted">Unassigned</span>
+                            {% endif %}
+                        </td>
+                        <td class="small">{{ inst.scheduled_date or '-' }}</td>
+                        <td class="font-monospace small">{{ inst.drop_cable_length }} m</td>
+                        <td>
+                            {% if inst.optical_power_dbm and inst.optical_power_dbm != 0.0 %}
+                                <span class="badge {% if inst.optical_power_dbm >= -22.0 %}bg-success{% elif inst.optical_power_dbm >= -26.0 %}bg-warning text-dark{% else %}bg-danger{% endif %} font-monospace">
+                                    {{ inst.optical_power_dbm }} dBm
+                                </span>
+                            {% else %}
+                                <span class="text-muted small">Not Tested</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if inst.status == 'Completed' %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-check-circle-fill me-1"></i> Completed</span>
+                            {% elif inst.status == 'In Progress' %}
+                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle"><i class="bi bi-tools me-1"></i> In Progress</span>
+                            {% elif inst.status == 'Cancelled' %}
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Cancelled</span>
+                            {% else %}
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Scheduled</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary py-0 px-2" data-bs-toggle="modal" data-bs-target="#updateModal{{ inst.id }}">
+                                Update / Complete
+                            </button>
+                        </td>
+                    </tr>
+
+                    <!-- Modal: Update Installation -->
+                    <div class="modal fade" id="updateModal{{ inst.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <form action="{{ url_for('update_installation_status', id=inst.id) }}" method="POST" class="modal-content text-start">
+                                <div class="modal-header">
+                                    <h6 class="modal-title fw-bold">Update Work Order #INST-{{ "%04d"|format(inst.id) }}</h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold">Status</label>
+                                        <select name="status" class="form-select">
+                                            <option value="Scheduled" {% if inst.status == 'Scheduled' %}selected{% endif %}>Scheduled</option>
+                                            <option value="In Progress" {% if inst.status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                            <option value="Completed" {% if inst.status == 'Completed' %}selected{% endif %}>Completed (Activate Connection)</option>
+                                            <option value="Cancelled" {% if inst.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                                        </select>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6">
+                                            <label class="form-label small fw-bold">Drop Cable Used (Meters)</label>
+                                            <input type="number" step="any" name="drop_cable_length" class="form-control" value="{{ inst.drop_cable_length or 50 }}">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label small fw-bold">Optical Power Tested (dBm)</label>
+                                            <input type="number" step="0.1" name="optical_power_dbm" class="form-control" value="{{ inst.optical_power_dbm or -19.5 }}">
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6">
+                                            <label class="form-label small fw-bold">ONU Serial / MAC</label>
+                                            <input type="text" name="onu_mac" class="form-control" value="{{ inst.onu_mac or '' }}" placeholder="HWTC12345678">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label small fw-bold">Wi-Fi Router Model</label>
+                                            <input type="text" name="router_model" class="form-control" value="{{ inst.router_model or '' }}" placeholder="Tenda / TP-Link">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold">Technician Notes</label>
+                                        <textarea name="notes" class="form-control" rows="2" placeholder="Drop cable routed via pole 3, signal verified.">{{ inst.notes or '' }}</textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-primary btn-sm px-3">Save Update</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">No installation work orders logged yet. Click 'New Installation Ticket' to assign a field connection.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: New Installation -->
+<div class="modal fade" id="newInstallModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('add_installation') }}" method="POST" class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold"><i class="bi bi-calendar-plus me-2 text-primary"></i> Dispatch New Field Installation</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Select Subscriber</label>
+                    <select name="customer_id" class="form-select" required>
+                        {% for c in customers %}
+                            <option value="{{ c.id }}">{{ c.full_name }} (@{{ c.pppoe_username }}) &bull; {{ c.area or 'No Area' }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Assign Field Technician</label>
+                    <select name="technician_id" class="form-select">
+                        <option value="">-- Auto Dispatch / Later --</option>
+                        {% for t in technicians %}
+                            <option value="{{ t.id }}">{{ t.full_name }} ({{ t.role }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Scheduled Installation Date</label>
+                    <input type="date" name="scheduled_date" class="form-control" value="{{ now_date }}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Work Order Instructions</label>
+                    <textarea name="notes" class="form-control" rows="2" placeholder="Drop cable installation from FDB box on pole #4. Bring single-band ONU."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm px-3">Dispatch Work Order</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

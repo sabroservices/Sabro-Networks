@@ -1,0 +1,441 @@
+{% extends "base.html" %}
+
+{% block page_title %}Customer 360° Profile — {{ customer.full_name }}{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+    <!-- Header Banner -->
+    <div class="col-12">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
+            <div class="card-body p-4 text-white">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center shadow" style="width: 68px; height: 68px; background: #2563eb; color: #fff; font-size: 1.75rem; font-weight: 800;">
+                            {{ customer.full_name[:2].upper() }}
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <h3 class="fw-bold mb-0 text-white">{{ customer.full_name }}</h3>
+                                {% if customer.status == 'Active' %}
+                                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 px-2 py-1"><i class="bi bi-check-circle-fill me-1"></i> Active</span>
+                                {% elif customer.status == 'Suspended' %}
+                                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-50 px-2 py-1"><i class="bi bi-pause-circle-fill me-1"></i> Suspended</span>
+                                {% else %}
+                                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-2 py-1"><i class="bi bi-x-circle-fill me-1"></i> Expired</span>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex flex-wrap align-items-center gap-3 mt-1 text-slate-300 font-monospace small">
+                                <span><i class="bi bi-person text-primary"></i> @{{ customer.pppoe_username }}</span>
+                                <span><i class="bi bi-telephone text-success"></i> {{ customer.phone or 'No phone' }}</span>
+                                <span><i class="bi bi-geo-alt text-danger"></i> {{ customer.area or 'Area Unassigned' }}</span>
+                                <span><i class="bi bi-hdd-network text-info"></i> {{ tariff.name if tariff else 'No Plan' }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex flex-wrap gap-2">
+                        {% if customer.phone %}
+                            {% set clean_phone = clean_whatsapp_phone(customer.phone) %}
+                            <a href="https://wa.me/{{ clean_phone }}?text=Assalam-o-Alaikum%20{{ customer.full_name | urlencode }},%20Sabro%20Networks%20greeting." target="_blank" class="btn btn-success btn-sm px-3 shadow-sm">
+                                <i class="bi bi-whatsapp me-1"></i> WhatsApp
+                            </a>
+                        {% endif %}
+                        <a href="{{ url_for('customer_statement', id=customer.id) }}" target="_blank" class="btn btn-light btn-sm px-3 shadow-sm">
+                            <i class="bi bi-printer me-1"></i> Statement
+                        </a>
+                        <form action="{{ url_for('toggle_customer_status', id=customer.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Toggle account status?');">
+                            {% if customer.status == 'Active' %}
+                                <button type="submit" class="btn btn-warning btn-sm px-3 shadow-sm text-dark">
+                                    <i class="bi bi-pause-fill me-1"></i> Suspend
+                                </button>
+                            {% else %}
+                                <button type="submit" class="btn btn-primary btn-sm px-3 shadow-sm">
+                                    <i class="bi bi-play-fill me-1"></i> Activate
+                                </button>
+                            {% endif %}
+                        </form>
+                        <a href="{{ url_for('customers_list') }}" class="btn btn-outline-light btn-sm px-3">
+                            <i class="bi bi-arrow-left me-1"></i> All Customers
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs Navigation -->
+<ul class="nav nav-pills nav-fill gap-2 p-1 bg-white border rounded-3 mb-4 shadow-sm" id="customerTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold py-2" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab">
+            <i class="bi bi-info-circle me-1"></i> Overview
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold py-2" id="ftth-tab" data-bs-toggle="tab" data-bs-target="#ftth" type="button" role="tab">
+            <i class="bi bi-diagram-3 me-1"></i> FTTH & Optical Link
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold py-2" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button" role="tab">
+            <i class="bi bi-receipt-cutoff me-1"></i> Invoices & Billing ({{ invoices|length }})
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold py-2" id="deposits-tab" data-bs-toggle="tab" data-bs-target="#deposits" type="button" role="tab">
+            <i class="bi bi-shield-lock me-1"></i> Deposits ({{ deposits|length }})
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold py-2" id="tickets-tab" data-bs-toggle="tab" data-bs-target="#tickets" type="button" role="tab">
+            <i class="bi bi-headset me-1"></i> Complaints ({{ tickets|length }})
+        </button>
+    </li>
+</ul>
+
+<!-- Tab Content -->
+<div class="tab-content" id="customerTabContent">
+    <!-- TAB 1: OVERVIEW -->
+    <div class="tab-pane fade show active" id="overview" role="tabpanel">
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm rounded-3 h-100 table-card">
+                    <div class="card-header bg-white fw-bold">
+                        <i class="bi bi-person-badge text-primary me-2"></i> Account Information
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-borderless align-middle mb-0">
+                            <tr>
+                                <th class="text-muted fw-normal" style="width: 35%;">Customer ID</th>
+                                <td class="fw-bold font-monospace">#CUST-{{ "%04d"|format(customer.id) }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">PPPoE Username</th>
+                                <td class="fw-bold font-monospace text-primary">@{{ customer.pppoe_username }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">PPPoE Password</th>
+                                <td class="font-monospace"><span class="badge bg-light text-dark border">{{ customer.password }}</span></td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">National CNIC</th>
+                                <td class="font-monospace">{{ customer.cnic or 'Not Provided' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Phone / Mobile</th>
+                                <td>{{ customer.phone or 'Not Provided' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">WhatsApp</th>
+                                <td>{{ customer.whatsapp or customer.phone or 'Not Provided' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Registration Date</th>
+                                <td>{{ customer.created_at or 'N/A' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Installation Date</th>
+                                <td>{{ customer.installation_date or 'N/A' }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm rounded-3 h-100 table-card">
+                    <div class="card-header bg-white fw-bold">
+                        <i class="bi bi-geo-alt text-danger me-2"></i> Address & Geographic Coordinates
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-borderless align-middle mb-0">
+                            <tr>
+                                <th class="text-muted fw-normal" style="width: 35%;">Area / Sector</th>
+                                <td class="fw-bold">{{ customer.area or 'Unassigned' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">House Number</th>
+                                <td>{{ customer.house_no or 'N/A' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Street / Lane</th>
+                                <td>{{ customer.street or 'N/A' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Full Address</th>
+                                <td>{{ customer.address or 'No complete address recorded.' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">GPS Coordinates</th>
+                                <td>
+                                    {% if customer.lat and customer.lng and customer.lat != 0.0 %}
+                                        <a href="https://www.google.com/maps?q={{ customer.lat }},{{ customer.lng }}" target="_blank" class="badge bg-primary text-decoration-none">
+                                            <i class="bi bi-map-fill me-1"></i> {{ customer.lat }}, {{ customer.lng }}
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted small">No GPS recorded</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Subscription Expiry</th>
+                                <td>
+                                    <span class="fw-bold font-monospace">{{ customer.expiry_date or 'N/A' }}</span>
+                                    {% if customer.expiry_date %}
+                                        <span class="badge bg-secondary ms-1">Term Date</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Internal Notes</th>
+                                <td class="text-muted small">{{ customer.notes or 'No internal notes.' }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: FTTH & OPTICAL LINK -->
+    <div class="tab-pane fade" id="ftth" role="tabpanel">
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm rounded-3 h-100 table-card">
+                    <div class="card-header bg-white fw-bold">
+                        <i class="bi bi-diagram-2 text-primary me-2"></i> Optical Network Topology
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-borderless align-middle mb-0">
+                            <tr>
+                                <th class="text-muted fw-normal" style="width: 40%;">Assigned OLT</th>
+                                <td class="fw-bold">{{ olt.name if olt else 'Default Core OLT' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Distribution Box (FDB)</th>
+                                <td class="fw-bold font-monospace text-primary">{{ customer.db_box or 'Unassigned' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Fiber Splitter</th>
+                                <td>{{ splitter.name if splitter else 'Not linked to splitter DB' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Fiber Core Color</th>
+                                <td>
+                                    <span class="core-pill core-blue">
+                                        <span class="core-dot"></span>
+                                        {{ customer.fiber_core or 'Core 1 (Blue)' }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Estimated Link RX</th>
+                                <td>
+                                    <span class="badge bg-success font-monospace px-2 py-1">-19.2 dBm (Optimal)</span>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm rounded-3 h-100 table-card">
+                    <div class="card-header bg-white fw-bold">
+                        <i class="bi bi-modem text-success me-2"></i> Customer Premise Equipment (CPE)
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-borderless align-middle mb-0">
+                            <tr>
+                                <th class="text-muted fw-normal" style="width: 40%;">ONU / ONT Serial</th>
+                                <td class="fw-bold font-monospace text-dark">{{ customer.onu_serial or 'Not recorded' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">ONU MAC Address</th>
+                                <td class="font-monospace">{{ customer.onu_mac or 'Not recorded' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Wi-Fi Router Model</th>
+                                <td>{{ customer.router_model or 'Single-Band ONU' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Bandwidth Package</th>
+                                <td class="fw-bold text-primary">{{ tariff.name if tariff else 'Default Plan' }} ({{ tariff.speed_mb if tariff else 10 }} Mbps)</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted fw-normal">Standard Monthly Fee</th>
+                                <td class="fw-bold text-success">{{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(tariff.price if tariff else 0) }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: INVOICES & BILLING -->
+    <div class="tab-pane fade" id="invoices" role="tabpanel">
+        <div class="card border-0 shadow-sm rounded-3 table-card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-bold"><i class="bi bi-receipt text-primary me-2"></i> Invoices & Billing Ledger</span>
+                <span class="badge bg-primary">{{ invoices|length }} Invoices</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>Invoice #</th>
+                            <th>Month</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Due Date</th>
+                            <th>Paid Date</th>
+                            <th>Method</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if invoices %}
+                            {% for inv in invoices %}
+                            <tr>
+                                <td class="fw-bold font-monospace">{{ inv.invoice_number }}</td>
+                                <td>{{ inv.month_period }}</td>
+                                <td class="fw-bold text-dark">{{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(inv.amount) }}</td>
+                                <td>
+                                    {% if inv.status == 'Paid' %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle">PAID</span>
+                                    {% else %}
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">UNPAID</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small">{{ inv.due_date or '-' }}</td>
+                                <td class="small">{{ inv.paid_date or '-' }}</td>
+                                <td class="small">{{ inv.payment_method or '-' }}</td>
+                                <td class="text-end">
+                                    {% if inv.status != 'Paid' %}
+                                    <form action="{{ url_for('pay_invoice', id=inv.id) }}" method="POST" class="d-inline">
+                                        <input type="hidden" name="payment_method" value="Cash">
+                                        <button type="submit" class="btn btn-sm btn-success py-0 px-2" title="Mark Paid">
+                                            <i class="bi bi-check-lg"></i> Pay
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    <a href="{{ url_for('print_invoice', id=inv.id) }}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Print Slip">
+                                        <i class="bi bi-printer"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-muted">No invoices generated for this customer yet.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: DEPOSITS & ADVANCES -->
+    <div class="tab-pane fade" id="deposits" role="tabpanel">
+        <div class="card border-0 shadow-sm rounded-3 table-card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-bold"><i class="bi bi-shield-lock text-primary me-2"></i> Hardware Security Deposits & Advances</span>
+                <span class="badge bg-primary">{{ deposits|length }} Deposits</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>ID</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if deposits %}
+                            {% for dep in deposits %}
+                            <tr>
+                                <td class="font-monospace">#{{ dep.id }}</td>
+                                <td class="fw-bold">{{ dep.deposit_type }}</td>
+                                <td class="fw-bold text-success">{{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(dep.amount) }}</td>
+                                <td><span class="badge bg-info-subtle text-info border border-info-subtle">{{ dep.status }}</span></td>
+                                <td class="small">{{ dep.date }}</td>
+                                <td class="small text-muted">{{ dep.notes or '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">No security deposits on file.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 5: COMPLAINTS & TICKETS -->
+    <div class="tab-pane fade" id="tickets" role="tabpanel">
+        <div class="card border-0 shadow-sm rounded-3 table-card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-bold"><i class="bi bi-headset text-primary me-2"></i> Complaint History & Field Tickets</span>
+                <span class="badge bg-primary">{{ tickets|length }} Tickets</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>Ticket #</th>
+                            <th>Subject</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Resolution Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if tickets %}
+                            {% for tck in tickets %}
+                            <tr>
+                                <td class="fw-bold font-monospace">{{ tck.ticket_number }}</td>
+                                <td>{{ tck.subject }}</td>
+                                <td>
+                                    {% if tck.priority == 'Critical' %}
+                                        <span class="badge bg-danger">Critical</span>
+                                    {% elif tck.priority == 'High' %}
+                                        <span class="badge bg-warning text-dark">High</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Normal</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if tck.status == 'Resolved' %}
+                                        <span class="badge bg-success">Resolved</span>
+                                    {% elif tck.status == 'In Progress' %}
+                                        <span class="badge bg-info text-dark">In Progress</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Open</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small">{{ tck.created_at }}</td>
+                                <td class="small text-muted">{{ tck.resolution_notes or '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">No complaints recorded for this subscriber.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

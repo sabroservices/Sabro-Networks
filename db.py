@@ -441,7 +441,19 @@ def init_db(force_reset=False):
         ("db_box", "TEXT DEFAULT ''"),
         ("fiber_core", "TEXT DEFAULT ''"),
         ("cnic", "TEXT DEFAULT ''"),
-        ("installation_date", "TEXT")
+        ("installation_date", "TEXT"),
+        ("lat", "REAL DEFAULT 0.0"),
+        ("lng", "REAL DEFAULT 0.0"),
+        ("street", "TEXT DEFAULT ''"),
+        ("house_no", "TEXT DEFAULT ''"),
+        ("whatsapp", "TEXT DEFAULT ''"),
+        ("monthly_fee", "REAL DEFAULT 0.0"),
+        ("activation_date", "TEXT DEFAULT ''"),
+        ("onu_mac", "TEXT DEFAULT ''"),
+        ("router_model", "TEXT DEFAULT ''"),
+        ("olt_id", "INTEGER"),
+        ("splitter_id", "INTEGER"),
+        ("notes", "TEXT DEFAULT ''")
     ]
     for col_name, col_def in ftth_columns:
         if col_name not in cust_cols:
@@ -465,6 +477,19 @@ def init_db(force_reset=False):
         FOREIGN KEY (collected_by_staff_id) REFERENCES users (id)
     )
     """)
+
+    # Dynamic column migrations for invoices table
+    inv_cols = [c[1] for c in cursor.execute("PRAGMA table_info(invoices)").fetchall()]
+    invoice_extra_cols = [
+        ("paid_amount", "REAL DEFAULT 0.0"),
+        ("balance_due", "REAL DEFAULT 0.0"),
+        ("discount", "REAL DEFAULT 0.0"),
+        ("additional_charges", "REAL DEFAULT 0.0"),
+        ("notes", "TEXT DEFAULT ''")
+    ]
+    for col_name, col_def in invoice_extra_cols:
+        if col_name not in inv_cols:
+            cursor.execute(f"ALTER TABLE invoices ADD COLUMN {col_name} {col_def};")
 
     # 6. Expenses Tracker
     cursor.execute("""
@@ -560,9 +585,160 @@ def init_db(force_reset=False):
     )
     """)
 
+    # Dynamic column migrations for tickets table
+    ticket_cols = [c[1] for c in cursor.execute("PRAGMA table_info(tickets)").fetchall()]
+    ticket_extra_cols = [
+        ("category", "TEXT DEFAULT 'Internet'"),
+        ("contact_phone", "TEXT DEFAULT ''")
+    ]
+    for col_name, col_def in ticket_extra_cols:
+        if col_name not in ticket_cols:
+            cursor.execute(f"ALTER TABLE tickets ADD COLUMN {col_name} {col_def};")
+
+    # 11. MikroTik RouterOS Gateways
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS routers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        ip_address TEXT NOT NULL,
+        api_port INTEGER DEFAULT 8728,
+        username TEXT NOT NULL,
+        password TEXT NOT NULL,
+        location TEXT DEFAULT '',
+        status TEXT DEFAULT 'Online', -- Online, Offline, Unreachable
+        last_seen TEXT,
+        created_at TEXT
+    )
+    """)
+
+    # 12. FTTH Optical Network Core: OLTs, PON Ports, Splitters, Fiber Cables & Cores
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS olts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        model TEXT DEFAULT 'EPON/GPON OLT',
+        ip_address TEXT DEFAULT '',
+        pon_ports_count INTEGER DEFAULT 8,
+        location TEXT DEFAULT '',
+        status TEXT DEFAULT 'Active', -- Active, Maintenance, Offline
+        notes TEXT,
+        created_at TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS pon_ports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        olt_id INTEGER NOT NULL,
+        port_number INTEGER NOT NULL,
+        max_capacity INTEGER DEFAULT 64,
+        optical_power_dbm REAL DEFAULT 3.5,
+        status TEXT DEFAULT 'Active',
+        FOREIGN KEY (olt_id) REFERENCES olts (id)
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS splitters (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        olt_id INTEGER,
+        pon_port_id INTEGER,
+        parent_splitter_id INTEGER,
+        location TEXT DEFAULT '',
+        lat REAL DEFAULT 0.0,
+        lng REAL DEFAULT 0.0,
+        ratio TEXT DEFAULT '1:8',
+        max_ports INTEGER DEFAULT 8,
+        used_ports INTEGER DEFAULT 0,
+        loss_db REAL DEFAULT 10.5,
+        notes TEXT,
+        created_at TEXT,
+        FOREIGN KEY (olt_id) REFERENCES olts (id),
+        FOREIGN KEY (pon_port_id) REFERENCES pon_ports (id)
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS fiber_cables (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        capacity_cores INTEGER DEFAULT 12,
+        start_point TEXT DEFAULT '',
+        end_point TEXT DEFAULT '',
+        length_meters REAL DEFAULT 0.0,
+        status TEXT DEFAULT 'Active',
+        created_at TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS fiber_cores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cable_id INTEGER NOT NULL,
+        core_number INTEGER NOT NULL,
+        color_name TEXT DEFAULT 'Blue',
+        status TEXT DEFAULT 'Free', -- Free, Spliced, Damaged, In Use
+        customer_id INTEGER,
+        notes TEXT,
+        FOREIGN KEY (cable_id) REFERENCES fiber_cables (id),
+        FOREIGN KEY (customer_id) REFERENCES customers (id)
+    )
+    """)
+
+    # 13. Optical Inventory & Assets Ledger
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS inventory_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL, -- ONU/ONT, Router, Drop Wire, Patch Cord, Joint Box, Connector, Tool
+        unit TEXT DEFAULT 'pcs',
+        quantity INTEGER DEFAULT 0,
+        unit_cost REAL DEFAULT 0.0,
+        retail_price REAL DEFAULT 0.0,
+        supplier TEXT DEFAULT '',
+        min_alert_threshold INTEGER DEFAULT 5,
+        created_at TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS inventory_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_id INTEGER NOT NULL,
+        transaction_type TEXT NOT NULL, -- Inbound, Outbound, Assigned, Damaged, Returned
+        quantity INTEGER NOT NULL,
+        recipient_type TEXT DEFAULT '', -- Technician, Customer, Maintenance
+        recipient_id INTEGER,
+        notes TEXT,
+        created_at TEXT,
+        FOREIGN KEY (item_id) REFERENCES inventory_items (id)
+    )
+    """)
+
+    # 14. Field Installation Workflows
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS installations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_id INTEGER NOT NULL,
+        technician_id INTEGER,
+        status TEXT DEFAULT 'Scheduled', -- Scheduled, In Progress, Completed, Cancelled
+        scheduled_date TEXT,
+        drop_cable_length REAL DEFAULT 0.0,
+        optical_power_dbm REAL DEFAULT -19.0,
+        onu_mac TEXT DEFAULT '',
+        router_model TEXT DEFAULT '',
+        notes TEXT,
+        completed_at TEXT,
+        created_at TEXT,
+        FOREIGN KEY (customer_id) REFERENCES customers (id),
+        FOREIGN KEY (technician_id) REFERENCES users (id)
+    )
+    """)
+
     conn.commit()
 
-    # 11. Performance Indexes
+    # 15. Performance Indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_customer ON invoices(customer_id, id DESC);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_staff ON invoices(collected_by_staff_id);")
@@ -571,6 +747,9 @@ def init_db(force_reset=False):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_deposits_customer ON deposits(customer_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_customers_area ON customers(area);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_splitters_olt ON splitters(olt_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_installations_status ON installations(status);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory_items(category);")
     conn.commit()
 
     # 12. Default System Settings

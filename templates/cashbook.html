@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block page_title %}Financial Management & Cashbook{% endblock %}
+
+{% block content %}
+<!-- Top Metrics Row -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-3 table-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">Today's Collections</div>
+                    <h3 class="fw-bold mb-0 text-success">{{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(today_collections) }}</h3>
+                </div>
+                <div class="rounded-circle bg-success bg-opacity-10 p-3 text-success fs-4">
+                    <i class="bi bi-cash-stack"></i>
+                </div>
+            </div>
+            <div class="small text-muted mt-2">Cash & Digital Receipts Today</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-3 table-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">Today's Expenses</div>
+                    <h3 class="fw-bold mb-0 text-danger">{{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(today_expenses) }}</h3>
+                </div>
+                <div class="rounded-circle bg-danger bg-opacity-10 p-3 text-danger fs-4">
+                    <i class="bi bi-wallet2"></i>
+                </div>
+            </div>
+            <div class="small text-muted mt-2">Fuel, Fiber & Daily Kharcha</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-3 table-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">Today Net Cash in Hand</div>
+                    <h3 class="fw-bold mb-0 {% if today_net >= 0 %}text-primary{% else %}text-danger{% endif %}">
+                        {{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(today_net) }}
+                    </h3>
+                </div>
+                <div class="rounded-circle bg-primary bg-opacity-10 p-3 text-primary fs-4">
+                    <i class="bi bi-safe2"></i>
+                </div>
+            </div>
+            <div class="small text-muted mt-2">Net Closing Balance</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-3 table-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">MTD Net Operating P&L</div>
+                    <h3 class="fw-bold mb-0 {% if mtd_net >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(mtd_net) }}
+                    </h3>
+                </div>
+                <div class="rounded-circle bg-info bg-opacity-10 p-3 text-info fs-4">
+                    <i class="bi bi-graph-up-arrow"></i>
+                </div>
+            </div>
+            <div class="small text-muted mt-2">Current Month Profit & Loss</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Payment Methods Breakdown -->
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-3 table-card h-100">
+            <div class="card-header bg-white">
+                <i class="bi bi-pie-chart text-primary me-2"></i> Collections by Payment Channel
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless align-middle mb-0">
+                    <tr>
+                        <th class="fw-normal"><i class="bi bi-cash me-2 text-success"></i> Cash In Hand</th>
+                        <td class="text-end fw-bold font-monospace">{{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(method_totals.get('Cash', 0.0)) }}</td>
+                    </tr>
+                    <tr>
+                        <th class="fw-normal"><i class="bi bi-phone me-2 text-danger"></i> JazzCash Digital</th>
+                        <td class="text-end fw-bold font-monospace">{{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(method_totals.get('JazzCash', 0.0)) }}</td>
+                    </tr>
+                    <tr>
+                        <th class="fw-normal"><i class="bi bi-wallet me-2 text-success"></i> Easypaisa Digital</th>
+                        <td class="text-end fw-bold font-monospace">{{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(method_totals.get('EasyPaisa', 0.0)) }}</td>
+                    </tr>
+                    <tr>
+                        <th class="fw-normal"><i class="bi bi-bank me-2 text-primary"></i> Direct Bank Transfer</th>
+                        <td class="text-end fw-bold font-monospace">{{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(method_totals.get('Bank Transfer', 0.0)) }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recovery Staff Performance Leaderboard -->
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-3 table-card h-100">
+            <div class="card-header bg-white">
+                <i class="bi bi-award text-warning me-2"></i> Field Recovery Staff Collections
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>Staff Member</th>
+                            <th>Role / Area</th>
+                            <th class="text-end">Total Collected</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if staff_collections %}
+                            {% for sc in staff_collections %}
+                            <tr>
+                                <td class="fw-bold">{{ sc.full_name }}</td>
+                                <td class="small text-muted">{{ sc.role }} &bull; {{ sc.assigned_area or 'All' }}</td>
+                                <td class="text-end fw-bold font-monospace text-success">
+                                    {{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(sc.collected_amount or 0.0) }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center py-3 text-muted">No collections recorded by recovery staff.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Daily Cashbook Transactions -->
+<div class="card border-0 shadow-sm rounded-3 table-card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-bold"><i class="bi bi-journal-text text-primary me-2"></i> Daily Cashbook & Financial Transactions</span>
+        <a href="{{ url_for('export_cashbook_csv') }}" class="btn btn-sm btn-outline-success">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export CSV
+        </a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light small">
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Reference / Description</th>
+                    <th>Staff / Payer</th>
+                    <th>Method</th>
+                    <th class="text-end">Inflow (+)</th>
+                    <th class="text-end">Outflow (-)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if transactions %}
+                    {% for t in transactions %}
+                    <tr>
+                        <td class="small">{{ t.date }}</td>
+                        <td>
+                            {% if t.type == 'Collection' %}
+                                <span class="badge bg-success-subtle text-success">Receipt</span>
+                            {% else %}
+                                <span class="badge bg-danger-subtle text-danger">Expense</span>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold">{{ t.title }}</td>
+                        <td class="small text-muted">{{ t.actor or '-' }}</td>
+                        <td class="small">{{ t.method or '-' }}</td>
+                        <td class="text-end font-monospace fw-bold text-success">
+                            {{ "%.2f"|format(t.inflow) if t.inflow else '-' }}
+                        </td>
+                        <td class="text-end font-monospace fw-bold text-danger">
+                            {{ "%.2f"|format(t.outflow) if t.outflow else '-' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">No financial transactions recorded for this period.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

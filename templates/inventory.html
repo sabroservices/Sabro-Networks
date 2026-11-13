@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block page_title %}Optical Assets & Hardware Inventory{% endblock %}
+
+{% block content %}
+<!-- Top Metrics Row -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-3 table-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">Total Stock Valuation</div>
+                    <h3 class="fw-bold mb-0 text-primary">{{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(total_val) }}</h3>
+                </div>
+                <div class="rounded-circle bg-primary bg-opacity-10 p-3 text-primary fs-4">
+                    <i class="bi bi-wallet2"></i>
+                </div>
+            </div>
+            <div class="small text-muted mt-2">Hardware Assets at Unit Cost</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-3 table-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">Stock Item Types</div>
+                    <h3 class="fw-bold mb-0 text-success">{{ items|length }}</h3>
+                </div>
+                <div class="rounded-circle bg-success bg-opacity-10 p-3 text-success fs-4">
+                    <i class="bi bi-box-seam"></i>
+                </div>
+            </div>
+            <div class="small text-muted mt-2">Categorized FTTH Components</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-3 table-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small text-uppercase fw-bold">Low Stock Warnings</div>
+                    <h3 class="fw-bold mb-0 {% if low_stock_count > 0 %}text-danger{% else %}text-muted{% endif %}">{{ low_stock_count }}</h3>
+                </div>
+                <div class="rounded-circle bg-danger bg-opacity-10 p-3 text-danger fs-4">
+                    <i class="bi bi-exclamation-triangle"></i>
+                </div>
+            </div>
+            <div class="small text-muted mt-2">Items Below Reorder Threshold</div>
+        </div>
+    </div>
+</div>
+
+<!-- Inventory Ledger Table -->
+<div class="card border-0 shadow-sm rounded-3 table-card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-bold"><i class="bi bi-boxes text-primary me-2"></i> Warehouse Stock Ledger</span>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#transactModal">
+                <i class="bi bi-arrow-left-right me-1"></i> Stock Movement
+            </button>
+            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                <i class="bi bi-plus-lg me-1"></i> Add Hardware Item
+            </button>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light small">
+                <tr>
+                    <th>Item Description</th>
+                    <th>Category</th>
+                    <th>In Stock</th>
+                    <th>Unit Cost</th>
+                    <th>Retail Price</th>
+                    <th>Stock Value</th>
+                    <th>Alert Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if items %}
+                    {% for itm in items %}
+                    <tr>
+                        <td>
+                            <div class="fw-bold text-dark">{{ itm.name }}</div>
+                            <div class="small text-muted">Supplier: {{ itm.supplier or 'Standard Supplier' }}</div>
+                        </td>
+                        <td><span class="badge bg-secondary">{{ itm.category }}</span></td>
+                        <td>
+                            <span class="fs-6 fw-bold font-monospace">{{ itm.quantity }} {{ itm.unit }}</span>
+                        </td>
+                        <td class="font-monospace small">{{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(itm.unit_cost) }}</td>
+                        <td class="font-monospace small text-primary">{{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(itm.retail_price) }}</td>
+                        <td class="font-monospace fw-bold text-dark">{{ settings.get('currency', 'PKR') }} {{ "%.2f"|format(itm.quantity * itm.unit_cost) }}</td>
+                        <td>
+                            {% if itm.quantity <= itm.min_alert_threshold %}
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                                    <i class="bi bi-exclamation-circle-fill me-1"></i> Low Stock (Threshold: {{ itm.min_alert_threshold }})
+                                </span>
+                            {% else %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                    <i class="bi bi-check-circle-fill me-1"></i> In Stock
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">No inventory items recorded yet. Click 'Add Hardware Item' to start tracking ONU, routers, and fiber cable stock.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Recent Transactions Ledger -->
+<div class="card border-0 shadow-sm rounded-3 table-card">
+    <div class="card-header bg-white">
+        <i class="bi bi-clock-history text-secondary me-2"></i> Recent Stock Transactions (Inbound, Outbound, Field Dispatches)
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light small">
+                <tr>
+                    <th>Date & Time</th>
+                    <th>Item</th>
+                    <th>Type</th>
+                    <th>Quantity</th>
+                    <th>Recipient / Assigned</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if transactions %}
+                    {% for tr in transactions %}
+                    <tr>
+                        <td class="small">{{ tr.created_at }}</td>
+                        <td class="fw-bold">{{ tr.item_name }}</td>
+                        <td>
+                            {% if tr.transaction_type == 'Inbound' %}
+                                <span class="badge bg-success">Inbound / Purchase</span>
+                            {% elif tr.transaction_type == 'Outbound' %}
+                                <span class="badge bg-primary">Outbound / Used</span>
+                            {% elif tr.transaction_type == 'Damaged' %}
+                                <span class="badge bg-danger">Damaged</span>
+                            {% else %}
+                                <span class="badge bg-info text-dark">{{ tr.transaction_type }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold font-monospace">{{ tr.quantity }}</td>
+                        <td class="small">{{ tr.recipient_type or '-' }}</td>
+                        <td class="small text-muted">{{ tr.notes or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-3 text-muted">No recent stock transactions recorded.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Add Item -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('add_inventory_item') }}" method="POST" class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold"><i class="bi bi-box-seam me-2 text-primary"></i> Add Hardware Item</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Item Name / Model</label>
+                    <input type="text" name="name" class="form-control" required placeholder="e.g. Huawei HG8310M XPON 1GE ONU">
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">Category</label>
+                        <select name="category" class="form-select">
+                            <option value="ONU/ONT" selected>ONU/ONT</option>
+                            <option value="Wi-Fi Router">Wi-Fi Router</option>
+                            <option value="Drop Wire (Meters)">Drop Wire (Meters)</option>
+                            <option value="Fiber Patch Cord">Fiber Patch Cord</option>
+                            <option value="Splitter / FDB">Splitter / FDB</option>
+                            <option value="Joint Enclosure">Joint Enclosure</option>
+                            <option value="Fast Connector">Fast Connector</option>
+                            <option value="Technician Tool">Technician Tool</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">Measurement Unit</label>
+                        <input type="text" name="unit" class="form-control" value="pcs" placeholder="pcs, meters, rolls">
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-4">
+                        <label class="form-label small fw-bold">Initial Qty</label>
+                        <input type="number" name="quantity" class="form-control" value="10" min="0">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small fw-bold">Unit Cost (PKR)</label>
+                        <input type="number" step="any" name="unit_cost" class="form-control" value="2200">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small fw-bold">Retail (PKR)</label>
+                        <input type="number" step="any" name="retail_price" class="form-control" value="2800">
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">Supplier</label>
+                        <input type="text" name="supplier" class="form-control" placeholder="e.g. Optical Wholesale Market">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">Reorder Alert Qty</label>
+                        <input type="number" name="min_alert_threshold" class="form-control" value="5">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm px-3">Save Item</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Stock Movement -->
+<div class="modal fade" id="transactModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('inventory_transact') }}" method="POST" class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold"><i class="bi bi-arrow-left-right me-2 text-primary"></i> Stock Movement (In / Out)</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Select Hardware Item</label>
+                    <select name="item_id" class="form-select" required>
+                        {% for itm in items %}
+                            <option value="{{ itm.id }}">{{ itm.name }} (Current: {{ itm.quantity }} {{ itm.unit }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">Movement Type</label>
+                        <select name="transaction_type" class="form-select">
+                            <option value="Inbound" selected>Inbound / Purchase (+)</option>
+                            <option value="Outbound">Outbound / Used (-)</option>
+                            <option value="Damaged">Damaged / Discarded (-)</option>
+                            <option value="Returned">Returned to Stock (+)</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">Quantity</label>
+                        <input type="number" name="quantity" class="form-control" value="1" min="1" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Recipient / Technician / Reason</label>
+                    <input type="text" name="notes" class="form-control" placeholder="e.g. Issued to Field Technician for Connection #104">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm px-3">Record Movement</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

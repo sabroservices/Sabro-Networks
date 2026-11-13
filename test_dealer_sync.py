@@ -1,6 +1,9 @@
 import unittest
 import os
 import io
+import tempfile
+import shutil
+from datetime import datetime, timedelta
 import db
 import app as my_app
 from dealer_client import ConnectDealerClient, reconcile_dealer_data
@@ -8,9 +11,41 @@ from dealer_client import ConnectDealerClient, reconcile_dealer_data
 class TestDealerSyncSuite(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls._orig_db_path = db.DB_PATH
+        cls._tmp_dir = tempfile.mkdtemp(prefix="sabro_dealer_test_")
+        db.DB_PATH = os.path.join(cls._tmp_dir, "dealer_test.db")
+        db.init_db(force_reset=True)
+
         my_app.app.config["TESTING"] = True
         my_app.app.config["WTF_CSRF_ENABLED"] = False
         cls.client = my_app.app.test_client()
+
+        conn = db.get_db()
+        # Seed users required by dealer sync tests
+        conn.execute("""
+            INSERT OR REPLACE INTO users (id, full_name, username, password, role, phone, assigned_area, status, total_collected, created_at)
+            VALUES (1, 'Admin User', 'admin', 'admin123', 'Admin', '0300-0000000', 'All Areas', 'Active', 0.0, date('now'))
+        """)
+        conn.execute("""
+            INSERT OR REPLACE INTO users (full_name, username, password, role, phone, assigned_area, status, total_collected, created_at)
+            VALUES ('Recovery Staff', 'recovery_boy', 'recovery123', 'Recovery Boy', '0321-1111111', 'Sector A', 'Active', 0.0, date('now'))
+        """)
+        conn.execute("""
+            INSERT OR REPLACE INTO users (full_name, username, password, role, phone, assigned_area, status, total_collected, created_at)
+            VALUES ('Complaint Tech', 'complaint_boy', 'tech123', 'Complaint Boy', '0333-2222222', 'Sector B', 'Active', 0.0, date('now'))
+        """)
+        conn.execute("INSERT OR IGNORE INTO tariffs (id, name, speed_mb, price, description) VALUES (1, '15 MB Plan', 15, 1200, 'Standard')")
+        conn.execute("""
+            INSERT INTO customers (id, full_name, pppoe_username, password, phone, address, area, tariff_id, status, expiry_date, onu_serial, db_box, fiber_core, cnic, created_at)
+            VALUES (1, 'Existing Subscriber', 'exist.user', 'secret1', '0300-1122334', 'House 1', 'Sector A', 1, 'Active', date('now', '+15 days'), 'ONU-EX-9988', 'FDB-01, Pole 2', 'Core 1 (Blue)', '35201-9988776-1', date('now'))
+        """)
+        conn.commit()
+        conn.close()
+
+    @classmethod
+    def tearDownClass(cls):
+        db.DB_PATH = cls._orig_db_path
+        shutil.rmtree(cls._tmp_dir, ignore_errors=True)
 
     def login(self, username, password):
         return self.client.post("/login", data={

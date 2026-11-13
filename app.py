@@ -9,10 +9,12 @@ import io
 import tempfile
 from functools import wraps
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, send_file, g
+from flask import Flask, render_template, request, redirect, url_for, flash, session, Response, send_file, g, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 import db
 import dealer_client
+import ftth_engine
+import mikrotik_client
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -316,7 +318,7 @@ def inject_globals():
 @app.before_request
 def require_login():
     # Allow login, static files, and public invoice print views without authentication
-    allowed_endpoints = ['login', 'static', 'print_invoice', 'health_diagnostic']
+    allowed_endpoints = ['login', 'static', 'print_invoice', 'health_diagnostic', 'customer_login', 'customer_logout', 'customer_dashboard', 'customer_invoices', 'customer_tickets', 'customer_new_ticket']
     if request.endpoint not in allowed_endpoints and not session.get('user_id'):
         return redirect(url_for('login'))
 
@@ -2632,6 +2634,799 @@ def dealer_sync_test_connection():
         
     return redirect(url_for("dealer_sync_page"))
 
+
+
+
+# ================= CUSTOMER PORTAL AUTH DECORATOR =================
+def customer_login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get("customer_id"):
+            flash("Please sign in with your PPPoE credentials to view your subscriber portal.", "info")
+            return redirect(url_for("customer_login"))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+# ================= MIKROTIK ROUTEROS GATEWAY ROUTES =================
+@app.route("/routers")
+@app.route("/routers/<int:router_id>")
+@admin_only
+def routers_page(router_id=None):
+    conn = db.get_db()
+    routers = conn.execute("SELECT * FROM routers ORDER BY id ASC").fetchall()
+    if not routers:
+        conn.execute("""
+            INSERT INTO routers (name, ip_address, api_port, username, password, location, status, created_at)
+            VALUES ('Main Core Router', '192.168.88.1', 8728, 'admin', '', 'Central NOC Rack 1', 'Online', date('now'))
+        """)
+        conn.commit()
+        routers = conn.execute("SELECT * FROM routers ORDER BY id ASC").fetchall()
+        
+    active_router = None
+    if router_id:
+        for r in routers:
+            if r["id"] == router_id:
+                active_router = r
+                break
+    if not active_router:
+        active_router = routers[0]
+
+    mgr = mikrotik_client.MikroTikManager(
+        host=active_router["ip_address"],
+        port=active_router["api_port"],
+        username=active_router["username"],
+        password=active_router["password"],
+        name=active_router["name"]
+    )
+    test_result = mgr.test_connection()
+    stats = mgr.get_router_stats()
+    customers = conn.execute("SELECT * FROM customers WHERE status = 'Active' ORDER BY id DESC LIMIT 50").fetchall()
+    conn.close()
+
+    sessions = mgr.get_active_sessions(customers)
+    return render_template("mikrotik.html",
+                           router=active_router,
+                           routers=routers,
+                           test_result=test_result,
+                           stats=stats,
+                           sessions=sessions)
+
+@app.route("/routers/add", methods=["POST"])
+@admin_only
+def add_router():
+    name = (request.form.get("name") or "").strip()
+    ip_address = (request.form.get("ip_address") or "").strip()
+    try:
+        api_port = int(request.form.get("api_port", 8728) or 8728)
+    except (ValueError, TypeError):
+        api_port = 8728
+    username = (request.form.get("username") or "").strip() or "admin"
+    password = (request.form.get("password") or "").strip()
+    location = (request.form.get("location") or "").strip()
+    
+    if not name or not ip_address:
+        flash("Router name and IP address are required.", "danger")
+        return redirect(url_for("routers_page"))
+        
+    conn = db.get_db()
+    conn.execute("""
+        INSERT INTO routers (name, ip_address, api_port, username, password, location, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'Online', date('now'))
+    """, (name, ip_address, api_port, username, password, location))
+    conn.commit()
+    conn.close()
+    flash(f"Router '{name}' ({ip_address}) added successfully.", "success")
+    return redirect(url_for("routers_page"))
+
+@app.route("/routers/delete/<int:id>", methods=["POST"])
+@admin_only
+def delete_router(id):
+    conn = db.get_db()
+    conn.execute("DELETE FROM routers WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    flash("Router removed successfully.", "info")
+    return redirect(url_for("routers_page"))
+
+@app.route("/routers/sync_all", methods=["POST"])
+@admin_only
+def mikrotik_sync_all():
+    conn = db.get_db()
+    customers = conn.execute("SELECT * FROM customers WHERE status = 'Active'").fetchall()
+    tariffs_raw = conn.execute("SELECT * FROM tariffs").fetchall()
+    conn.close()
+    
+    t_map = {t["id"]: t for t in tariffs_raw}
+    mgr = mikrotik_client.MikroTikManager()
+    synced_count = 0
+    for c in customers:
+        t = t_map.get(c["tariff_id"])
+        mgr.sync_customer(c, t)
+        synced_count += 1
+        
+    flash(f"Successfully synchronized {synced_count} active subscriber accounts and queues to MikroTik.", "success")
+    return redirect(url_for("routers_page"))
+
+@app.route("/routers/cutoff_expired", methods=["POST"])
+@admin_only
+def mikrotik_cutoff_expired():
+    conn = db.get_db()
+    expired = conn.execute("SELECT pppoe_username FROM customers WHERE status != 'Active' OR date(expiry_date) < date('now')").fetchall()
+    conn.close()
+    
+    usernames = [e["pppoe_username"] for e in expired]
+    mgr = mikrotik_client.MikroTikManager()
+    res = mgr.cutoff_expired_users(usernames)
+    flash(f"Executed 1-Click Cutoff: {res['count']} expired subscribers dropped and suspended on MikroTik.", "warning")
+    return redirect(url_for("routers_page"))
+
+@app.route("/routers/kick/<username>", methods=["POST"])
+@admin_only
+def mikrotik_kick_session(username):
+    mgr = mikrotik_client.MikroTikManager()
+    res = mgr.kick_session(username)
+    flash(res["message"], "info")
+    return redirect(url_for("routers_page"))
+
+@app.route("/api/routers/<int:id>/traffic")
+@admin_only
+def api_router_traffic(id):
+    mgr = mikrotik_client.MikroTikManager()
+    stats = mgr.get_router_stats()
+    return jsonify({
+        "success": True,
+        "interfaces": stats["interfaces"],
+        "cpu_load": stats["cpu_load"]
+    })
+
+
+# ================= FTTH / GPON OPTICAL TOPOLOGY ROUTES =================
+@app.route("/ftth/topology")
+@admin_only
+def ftth_topology_page():
+    conn = db.get_db()
+    olts = conn.execute("SELECT * FROM olts ORDER BY id ASC").fetchall()
+    if not olts:
+        conn.execute("""
+            INSERT INTO olts (name, model, ip_address, pon_ports_count, location, status, created_at)
+            VALUES ('Main Headend OLT 01', 'VSOL V1600G1 8-Port GPON', '192.168.8.100', 8, 'Central NOC Server Rack', 'Active', date('now'))
+        """)
+        conn.commit()
+        olt_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        for p in range(1, 9):
+            conn.execute("""
+                INSERT INTO pon_ports (olt_id, port_number, max_capacity, optical_power_dbm, status)
+                VALUES (?, ?, 64, 3.5, 'Active')
+            """, (olt_id, p))
+        conn.commit()
+        olts = conn.execute("SELECT * FROM olts ORDER BY id ASC").fetchall()
+
+    splitters = conn.execute("SELECT * FROM splitters ORDER BY id ASC").fetchall()
+    if not splitters:
+        conn.execute("""
+            INSERT INTO splitters (name, ratio, max_ports, used_ports, loss_db, location, lat, lng, created_at)
+            VALUES ('FDB-01 Sector A', '1:8', 8, 3, 10.5, 'Pole #14 Main Street', 24.8607, 67.0011, date('now'))
+        """)
+        conn.execute("""
+            INSERT INTO splitters (name, ratio, max_ports, used_ports, loss_db, location, lat, lng, created_at)
+            VALUES ('FDB-02 Sector B', '1:8', 8, 2, 10.5, 'Pole #07 Near Mosque', 24.8640, 67.0050, date('now'))
+        """)
+        conn.commit()
+        splitters = conn.execute("SELECT * FROM splitters ORDER BY id ASC").fetchall()
+
+    total_pon_ports = sum(o["pon_ports_count"] for o in olts)
+    total_subscribers = conn.execute("SELECT COUNT(*) FROM customers WHERE status = 'Active'").fetchone()[0]
+    conn.close()
+
+    return render_template("ftth_topology.html",
+                           olts=olts,
+                           splitters=splitters,
+                           total_pon_ports=total_pon_ports,
+                           total_subscribers=total_subscribers)
+
+@app.route("/ftth/olts/add", methods=["POST"])
+@admin_only
+def add_olt():
+    name = (request.form.get("name") or "").strip()
+    model = (request.form.get("model") or "GPON OLT").strip()
+    ip_address = (request.form.get("ip_address") or "").strip()
+    try:
+        pon_ports_count = int(request.form.get("pon_ports_count", 8) or 8)
+    except (ValueError, TypeError):
+        pon_ports_count = 8
+    location = (request.form.get("location") or "").strip()
+
+    if not name:
+        flash("OLT Name is required.", "danger")
+        return redirect(url_for("ftth_topology_page"))
+
+    conn = db.get_db()
+    conn.execute("""
+        INSERT INTO olts (name, model, ip_address, pon_ports_count, location, status, created_at)
+        VALUES (?, ?, ?, ?, ?, 'Active', date('now'))
+    """, (name, model, ip_address, pon_ports_count, location))
+    olt_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    for p in range(1, pon_ports_count + 1):
+        conn.execute("""
+            INSERT INTO pon_ports (olt_id, port_number, max_capacity, optical_power_dbm, status)
+            VALUES (?, ?, 64, 3.5, 'Active')
+        """, (olt_id, p))
+    conn.commit()
+    conn.close()
+    flash(f"OLT '{name}' ({pon_ports_count} PON Ports) added successfully.", "success")
+    return redirect(url_for("ftth_topology_page"))
+
+@app.route("/ftth/olts/delete/<int:id>", methods=["POST"])
+@admin_only
+def delete_olt(id):
+    conn = db.get_db()
+    conn.execute("DELETE FROM pon_ports WHERE olt_id = ?", (id,))
+    conn.execute("DELETE FROM olts WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    flash("OLT and associated PON ports deleted.", "info")
+    return redirect(url_for("ftth_topology_page"))
+
+@app.route("/ftth/splitters/add", methods=["POST"])
+@admin_only
+def add_splitter():
+    name = (request.form.get("name") or "").strip()
+    ratio = (request.form.get("ratio") or "1:8").strip()
+    try:
+        max_ports = int(request.form.get("max_ports", 8) or 8)
+    except (ValueError, TypeError):
+        max_ports = 8
+    location = (request.form.get("location") or "").strip()
+    try:
+        lat = float(request.form.get("lat") or 0.0)
+        lng = float(request.form.get("lng") or 0.0)
+    except (ValueError, TypeError):
+        lat, lng = 0.0, 0.0
+
+    loss_map = {"1:2": 3.7, "1:4": 7.3, "1:8": 10.5, "1:16": 13.8, "1:32": 17.2, "1:64": 20.8}
+    loss_db = loss_map.get(ratio, 10.5)
+
+    if not name:
+        flash("Splitter name is required.", "danger")
+        return redirect(url_for("ftth_topology_page"))
+
+    conn = db.get_db()
+    conn.execute("""
+        INSERT INTO splitters (name, ratio, max_ports, used_ports, loss_db, location, lat, lng, created_at)
+        VALUES (?, ?, ?, 0, ?, ?, ?, ?, date('now'))
+    """, (name, ratio, max_ports, loss_db, location, lat, lng))
+    conn.commit()
+    conn.close()
+    flash(f"Splitter '{name}' ({ratio}) created successfully.", "success")
+    return redirect(url_for("ftth_topology_page"))
+
+@app.route("/ftth/splitters/delete/<int:id>", methods=["POST"])
+@admin_only
+def delete_splitter(id):
+    conn = db.get_db()
+    conn.execute("DELETE FROM splitters WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    flash("Splitter / FDB box removed.", "info")
+    return redirect(url_for("ftth_topology_page"))
+
+@app.route("/api/ftth/calculate_budget")
+def api_optical_budget():
+    try:
+        tx = float(request.args.get("tx", 3.5))
+        dist = float(request.args.get("distance", 1000))
+        ratio = request.args.get("ratio", "1:8")
+    except (ValueError, TypeError):
+        tx, dist, ratio = 3.5, 1000, "1:8"
+    result = ftth_engine.calculate_optical_budget(tx, dist, [ratio])
+    return jsonify(result)
+
+
+# ================= NETWORK GIS MAP ROUTES =================
+@app.route("/network/map")
+@admin_only
+def network_map_page():
+    conn = db.get_db()
+    olts = conn.execute("SELECT * FROM olts").fetchall()
+    splitters = conn.execute("SELECT * FROM splitters").fetchall()
+    customers = conn.execute("SELECT id, full_name, pppoe_username, phone, status, lat, lng, db_box, fiber_core FROM customers").fetchall()
+    conn.close()
+    return render_template("network_map.html", olts=olts, splitters=splitters, customers=customers)
+
+@app.route("/api/network/map_data")
+@admin_only
+def api_map_data():
+    conn = db.get_db()
+    olts = [dict(o) for o in conn.execute("SELECT * FROM olts").fetchall()]
+    splitters = [dict(s) for s in conn.execute("SELECT * FROM splitters").fetchall()]
+    customers = [dict(c) for c in conn.execute("SELECT id, full_name, pppoe_username, status, lat, lng, db_box FROM customers").fetchall()]
+    conn.close()
+    return jsonify({"olts": olts, "splitters": splitters, "customers": customers})
+
+
+# ================= OPTICAL INVENTORY & ASSET LEDGER =================
+@app.route("/inventory")
+@admin_only
+def inventory_page():
+    conn = db.get_db()
+    items = conn.execute("SELECT * FROM inventory_items ORDER BY id DESC").fetchall()
+    if not items:
+        # Seed default inventory items
+        conn.execute("""
+            INSERT INTO inventory_items (name, category, unit, quantity, unit_cost, retail_price, supplier, min_alert_threshold, created_at)
+            VALUES ('Huawei HG8310M XPON 1GE ONU', 'ONU/ONT', 'pcs', 24, 2100, 2600, 'Optical Wholesale', 5, date('now'))
+        """)
+        conn.execute("""
+            INSERT INTO inventory_items (name, category, unit, quantity, unit_cost, retail_price, supplier, min_alert_threshold, created_at)
+            VALUES ('Tenda F3 300Mbps Wi-Fi Router', 'Wi-Fi Router', 'pcs', 15, 2900, 3500, 'Router Hub', 5, date('now'))
+        """)
+        conn.execute("""
+            INSERT INTO inventory_items (name, category, unit, quantity, unit_cost, retail_price, supplier, min_alert_threshold, created_at)
+            VALUES ('2-Core FTTH Drop Cable Steel Wire', 'Drop Wire (Meters)', 'meters', 850, 18, 25, 'Fiber Cable Mill', 200, date('now'))
+        """)
+        conn.commit()
+        items = conn.execute("SELECT * FROM inventory_items ORDER BY id DESC").fetchall()
+
+    transactions = conn.execute("""
+        SELECT t.*, i.name as item_name
+        FROM inventory_transactions t
+        JOIN inventory_items i ON t.item_id = i.id
+        ORDER BY t.id DESC LIMIT 20
+    """).fetchall()
+    
+    total_val = sum(i["quantity"] * i["unit_cost"] for i in items)
+    low_stock_count = sum(1 for i in items if i["quantity"] <= i["min_alert_threshold"])
+    conn.close()
+
+    return render_template("inventory.html",
+                           items=items,
+                           transactions=transactions,
+                           total_val=total_val,
+                           low_stock_count=low_stock_count)
+
+@app.route("/inventory/add", methods=["POST"])
+@admin_only
+def add_inventory_item():
+    name = (request.form.get("name") or "").strip()
+    category = request.form.get("category", "ONU/ONT")
+    unit = (request.form.get("unit") or "pcs").strip()
+    try:
+        quantity = int(request.form.get("quantity", 0) or 0)
+        unit_cost = float(request.form.get("unit_cost", 0) or 0)
+        retail_price = float(request.form.get("retail_price", 0) or 0)
+        min_alert_threshold = int(request.form.get("min_alert_threshold", 5) or 5)
+    except (ValueError, TypeError):
+        quantity, unit_cost, retail_price, min_alert_threshold = 0, 0.0, 0.0, 5
+
+    supplier = (request.form.get("supplier") or "").strip()
+
+    if not name:
+        flash("Item name is required.", "danger")
+        return redirect(url_for("inventory_page"))
+
+    conn = db.get_db()
+    conn.execute("""
+        INSERT INTO inventory_items (name, category, unit, quantity, unit_cost, retail_price, supplier, min_alert_threshold, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now'))
+    """, (name, category, unit, quantity, unit_cost, retail_price, supplier, min_alert_threshold))
+    item_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+    if quantity > 0:
+        conn.execute("""
+            INSERT INTO inventory_transactions (item_id, transaction_type, quantity, recipient_type, notes, created_at)
+            VALUES (?, 'Inbound', ?, 'Warehouse', 'Initial Stock Addition', datetime('now'))
+        """, (item_id, quantity))
+    conn.commit()
+    conn.close()
+    flash(f"Item '{name}' ({quantity} {unit}) added to inventory.", "success")
+    return redirect(url_for("inventory_page"))
+
+@app.route("/inventory/transact", methods=["POST"])
+@admin_only
+def inventory_transact():
+    try:
+        item_id = int(request.form.get("item_id"))
+        quantity = int(request.form.get("quantity", 1) or 1)
+    except (ValueError, TypeError):
+        flash("Invalid item or quantity.", "danger")
+        return redirect(url_for("inventory_page"))
+
+    tx_type = request.form.get("transaction_type", "Inbound")
+    notes = (request.form.get("notes") or "").strip()
+
+    conn = db.get_db()
+    item = conn.execute("SELECT * FROM inventory_items WHERE id = ?", (item_id,)).fetchone()
+    if not item:
+        conn.close()
+        flash("Item not found.", "danger")
+        return redirect(url_for("inventory_page"))
+
+    current_qty = item["quantity"]
+    if tx_type in ("Outbound", "Damaged"):
+        new_qty = max(0, current_qty - quantity)
+    else:
+        new_qty = current_qty + quantity
+
+    conn.execute("UPDATE inventory_items SET quantity = ? WHERE id = ?", (new_qty, item_id))
+    conn.execute("""
+        INSERT INTO inventory_transactions (item_id, transaction_type, quantity, recipient_type, notes, created_at)
+        VALUES (?, ?, ?, 'Field Ops', ?, datetime('now'))
+    """, (item_id, tx_type, quantity, notes))
+    conn.commit()
+    conn.close()
+    flash(f"Stock transaction logged: {tx_type} {quantity} {item['unit']} of '{item['name']}'.", "success")
+    return redirect(url_for("inventory_page"))
+
+
+# ================= FIELD INSTALLATIONS WORKFLOW =================
+@app.route("/installations")
+@admin_only
+def installations_page():
+    conn = db.get_db()
+    installations = conn.execute("""
+        SELECT i.*, c.full_name as customer_name, c.pppoe_username, c.phone, c.area, u.full_name as tech_name
+        FROM installations i
+        JOIN customers c ON i.customer_id = c.id
+        LEFT JOIN users u ON i.technician_id = u.id
+        ORDER BY i.id DESC
+    """).fetchall()
+
+    customers = conn.execute("SELECT id, full_name, pppoe_username, area FROM customers ORDER BY id DESC").fetchall()
+    technicians = conn.execute("SELECT id, full_name, role FROM users WHERE status = 'Active' AND role IN ('Complaint Boy', 'Staff', 'Admin')").fetchall()
+    
+    scheduled_count = sum(1 for i in installations if i["status"] == "Scheduled")
+    in_progress_count = sum(1 for i in installations if i["status"] == "In Progress")
+    completed_count = sum(1 for i in installations if i["status"] == "Completed")
+    now_date = datetime.now().strftime("%Y-%m-%d")
+    conn.close()
+
+    return render_template("installations.html",
+                           installations=installations,
+                           customers=customers,
+                           technicians=technicians,
+                           scheduled_count=scheduled_count,
+                           in_progress_count=in_progress_count,
+                           completed_count=completed_count,
+                           now_date=now_date)
+
+@app.route("/installations/add", methods=["POST"])
+@admin_only
+def add_installation():
+    try:
+        customer_id = int(request.form.get("customer_id"))
+    except (ValueError, TypeError):
+        flash("Please select a customer.", "danger")
+        return redirect(url_for("installations_page"))
+
+    try:
+        tech_id = int(request.form.get("technician_id")) if request.form.get("technician_id") else None
+    except (ValueError, TypeError):
+        tech_id = None
+
+    scheduled_date = request.form.get("scheduled_date") or datetime.now().strftime("%Y-%m-%d")
+    notes = (request.form.get("notes") or "").strip()
+
+    conn = db.get_db()
+    conn.execute("""
+        INSERT INTO installations (customer_id, technician_id, status, scheduled_date, notes, created_at)
+        VALUES (?, ?, 'Scheduled', ?, ?, datetime('now'))
+    """, (customer_id, tech_id, scheduled_date, notes))
+    conn.commit()
+    conn.close()
+    flash("Installation work order scheduled and dispatched.", "success")
+    return redirect(url_for("installations_page"))
+
+@app.route("/installations/update/<int:id>", methods=["POST"])
+@admin_only
+def update_installation_status(id):
+    status = request.form.get("status", "Completed")
+    try:
+        drop_cable_length = float(request.form.get("drop_cable_length", 0) or 0)
+        optical_power_dbm = float(request.form.get("optical_power_dbm", -19.5) or -19.5)
+    except (ValueError, TypeError):
+        drop_cable_length, optical_power_dbm = 0.0, -19.5
+
+    onu_mac = (request.form.get("onu_mac") or "").strip()
+    router_model = (request.form.get("router_model") or "").strip()
+    notes = (request.form.get("notes") or "").strip()
+
+    conn = db.get_db()
+    inst = conn.execute("SELECT customer_id FROM installations WHERE id = ?", (id,)).fetchone()
+    if not inst:
+        conn.close()
+        flash("Installation work order not found.", "danger")
+        return redirect(url_for("installations_page"))
+
+    completed_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if status == "Completed" else None
+    conn.execute("""
+        UPDATE installations
+        SET status = ?, drop_cable_length = ?, optical_power_dbm = ?, onu_mac = ?, router_model = ?, notes = ?, completed_at = ?
+        WHERE id = ?
+    """, (status, drop_cable_length, optical_power_dbm, onu_mac, router_model, notes, completed_at, id))
+
+    if status == "Completed":
+        conn.execute("""
+            UPDATE customers
+            SET status = 'Active', onu_serial = ?, router_model = ?
+            WHERE id = ?
+        """, (onu_mac, router_model, inst["customer_id"]))
+
+    conn.commit()
+    conn.close()
+    flash("Installation work order updated successfully.", "success")
+    return redirect(url_for("installations_page"))
+
+
+# ================= CUSTOMER 360° PROFILE & CRM =================
+@app.route("/customers/<int:id>/view")
+@role_required("Admin", "Staff", "Complaint Boy", "Recovery Boy")
+def view_customer(id):
+    conn = db.get_db()
+    customer = conn.execute("SELECT * FROM customers WHERE id = ?", (id,)).fetchone()
+    if not customer:
+        conn.close()
+        flash("Customer not found.", "danger")
+        return redirect(url_for("customers_list"))
+
+    tariff = conn.execute("SELECT * FROM tariffs WHERE id = ?", (customer["tariff_id"],)).fetchone() if customer["tariff_id"] else None
+    invoices = conn.execute("SELECT * FROM invoices WHERE customer_id = ? ORDER BY id DESC", (id,)).fetchall()
+    deposits = conn.execute("SELECT * FROM deposits WHERE customer_id = ? ORDER BY id DESC", (id,)).fetchall()
+    tickets = conn.execute("SELECT * FROM tickets WHERE customer_id = ? ORDER BY id DESC", (id,)).fetchall()
+    olt = conn.execute("SELECT * FROM olts WHERE id = ?", (customer["olt_id"],)).fetchone() if ("olt_id" in customer.keys() and customer["olt_id"]) else None
+    splitter = conn.execute("SELECT * FROM splitters WHERE id = ?", (customer["splitter_id"],)).fetchone() if ("splitter_id" in customer.keys() and customer["splitter_id"]) else None
+    conn.close()
+
+    return render_template("customer_detail.html",
+                           customer=customer,
+                           tariff=tariff,
+                           invoices=invoices,
+                           deposits=deposits,
+                           tickets=tickets,
+                           olt=olt,
+                           splitter=splitter)
+
+@app.route("/customers/<int:id>/statement")
+@role_required("Admin", "Staff", "Recovery Boy")
+def customer_statement(id):
+    conn = db.get_db()
+    customer = conn.execute("SELECT * FROM customers WHERE id = ?", (id,)).fetchone()
+    if not customer:
+        conn.close()
+        flash("Customer not found.", "danger")
+        return redirect(url_for("customers_list"))
+
+    tariff = conn.execute("SELECT * FROM tariffs WHERE id = ?", (customer["tariff_id"],)).fetchone() if customer["tariff_id"] else None
+    invoices = conn.execute("SELECT * FROM invoices WHERE customer_id = ? ORDER BY id ASC", (id,)).fetchall()
+    deposits = conn.execute("SELECT * FROM deposits WHERE customer_id = ? ORDER BY id ASC", (id,)).fetchall()
+    conn.close()
+
+    transactions = []
+    total_invoiced = 0.0
+    total_paid = 0.0
+
+    for inv in invoices:
+        total_invoiced += inv["amount"]
+        is_paid = (inv["status"] == "Paid")
+        if is_paid:
+            total_paid += inv["amount"]
+        transactions.append({
+            "date": inv["created_at"] or inv["due_date"],
+            "ref": inv["invoice_number"],
+            "desc": f"Monthly Internet Service Bill ({inv['month_period']})",
+            "status": inv["status"],
+            "debit": inv["amount"],
+            "credit": inv["amount"] if is_paid else 0.0
+        })
+
+    for dep in deposits:
+        transactions.append({
+            "date": dep["date"],
+            "ref": f"DEP-{dep['id']:04d}",
+            "desc": f"Hardware Security Deposit ({dep['deposit_type']})",
+            "status": dep["status"],
+            "debit": 0.0,
+            "credit": dep["amount"]
+        })
+
+    balance_due = max(0.0, total_invoiced - total_paid)
+    now_date = datetime.now().strftime("%d %B %Y")
+
+    return render_template("customer_statement.html",
+                           customer=customer,
+                           tariff=tariff,
+                           transactions=transactions,
+                           total_invoiced=total_invoiced,
+                           total_paid=total_paid,
+                           balance_due=balance_due,
+                           now_date=now_date)
+
+# ================= FINANCIAL CASHBOOK & P&L =================
+@app.route("/financials/cashbook")
+@admin_only
+def cashbook_page():
+    conn = db.get_db()
+    today = datetime.now().strftime("%Y-%m-%d")
+    current_month = datetime.now().strftime("%Y-%m")
+
+    today_collections = conn.execute("""
+        SELECT COALESCE(SUM(amount), 0.0) FROM invoices WHERE status = 'Paid' AND date(paid_date) = date('now')
+    """).fetchone()[0]
+
+    today_expenses = conn.execute("""
+        SELECT COALESCE(SUM(amount), 0.0) FROM expenses WHERE date(date) = date('now')
+    """).fetchone()[0]
+
+    today_net = today_collections - today_expenses
+
+    mtd_collections = conn.execute("""
+        SELECT COALESCE(SUM(amount), 0.0) FROM invoices WHERE status = 'Paid' AND strftime('%Y-%m', paid_date) = ?
+    """, (current_month,)).fetchone()[0]
+
+    mtd_expenses = conn.execute("""
+        SELECT COALESCE(SUM(amount), 0.0) FROM expenses WHERE strftime('%Y-%m', date) = ?
+    """, (current_month,)).fetchone()[0]
+
+    mtd_net = mtd_collections - mtd_expenses
+
+    method_rows = conn.execute("""
+        SELECT payment_method, COALESCE(SUM(amount), 0.0) as total
+        FROM invoices
+        WHERE status = 'Paid' AND payment_method IS NOT NULL AND payment_method != ''
+        GROUP BY payment_method
+    """).fetchall()
+    method_totals = {r["payment_method"]: r["total"] for r in method_rows}
+
+    staff_collections = conn.execute("""
+        SELECT u.id, u.full_name, u.role, u.assigned_area, COALESCE(SUM(i.amount), 0.0) as collected_amount
+        FROM users u
+        LEFT JOIN invoices i ON i.collected_by_staff_id = u.id AND i.status = 'Paid'
+        WHERE u.role IN ('Recovery Boy', 'Staff', 'Complaint Boy')
+        GROUP BY u.id
+        ORDER BY collected_amount DESC
+    """).fetchall()
+
+    paid_invoices = conn.execute("""
+        SELECT i.paid_date as date, 'Collection' as type, ('Invoice #' || i.invoice_number || ' - ' || c.full_name) as title,
+               COALESCE(u.full_name, 'Self') as actor, i.payment_method as method, i.amount as inflow, 0.0 as outflow
+        FROM invoices i
+        JOIN customers c ON i.customer_id = c.id
+        LEFT JOIN users u ON i.collected_by_staff_id = u.id
+        WHERE i.status = 'Paid'
+        ORDER BY i.id DESC LIMIT 15
+    """).fetchall()
+
+    expenses = conn.execute("""
+        SELECT date, 'Expense' as type, (title || ' (' || category || ')') as title,
+               COALESCE(paid_by, 'NOC') as actor, 'Cash' as method, 0.0 as inflow, amount as outflow
+        FROM expenses
+        ORDER BY id DESC LIMIT 15
+    """).fetchall()
+
+    transactions = sorted(list(paid_invoices) + list(expenses), key=lambda x: str(x["date"]), reverse=True)[:25]
+    conn.close()
+
+    return render_template("cashbook.html",
+                           today_collections=today_collections,
+                           today_expenses=today_expenses,
+                           today_net=today_net,
+                           mtd_net=mtd_net,
+                           method_totals=method_totals,
+                           staff_collections=staff_collections,
+                           transactions=transactions)
+
+@app.route("/financials/cashbook/export")
+@admin_only
+def export_cashbook_csv():
+    conn = db.get_db()
+    invoices = conn.execute("""
+        SELECT i.paid_date as date, 'Receipt' as type, i.invoice_number as ref, c.full_name as party,
+               i.payment_method as method, i.amount as amount
+        FROM invoices i
+        JOIN customers c ON i.customer_id = c.id
+        WHERE i.status = 'Paid'
+    """).fetchall()
+    expenses = conn.execute("""
+        SELECT date, 'Expense' as type, ('EXP-' || id) as ref, title as party,
+               'Cash' as method, amount as amount
+        FROM expenses
+    """).fetchall()
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Date", "Type", "Reference", "Party / Description", "Method", "Amount (PKR)"])
+    for r in invoices:
+        writer.writerow([r["date"], r["type"], r["ref"], r["party"], r["method"], r["amount"]])
+    for r in expenses:
+        writer.writerow([r["date"], r["type"], r["ref"], r["party"], r["method"], -r["amount"]])
+    output.seek(0)
+    return Response(output.getvalue(), mimetype="text/csv", headers={"Content-Disposition": "attachment;filename=sabro_cashbook_ledger.csv"})
+
+
+# ================= CUSTOMER SELF-SERVICE PORTAL =================
+@app.route("/customer/login", methods=["GET", "POST"])
+def customer_login():
+    if session.get("customer_id"):
+        return redirect(url_for("customer_dashboard"))
+        
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip()
+        password = (request.form.get("password") or "").strip()
+        
+        conn = db.get_db()
+        cust = conn.execute("SELECT * FROM customers WHERE pppoe_username = ?", (username,)).fetchone()
+        conn.close()
+        
+        if cust and cust["password"] == password:
+            session["customer_id"] = cust["id"]
+            session["customer_name"] = cust["full_name"]
+            session["customer_username"] = cust["pppoe_username"]
+            flash(f"Welcome to Sabro Networks, {cust['full_name']}!", "success")
+            return redirect(url_for("customer_dashboard"))
+        else:
+            flash("Invalid PPPoE username or password. Please verify and try again.", "danger")
+            
+    return render_template("customer_login.html")
+
+@app.route("/customer/logout")
+def customer_logout():
+    session.pop("customer_id", None)
+    session.pop("customer_name", None)
+    session.pop("customer_username", None)
+    flash("You have signed out of your subscriber account.", "info")
+    return redirect(url_for("customer_login"))
+
+@app.route("/customer/dashboard")
+@customer_login_required
+def customer_dashboard():
+    cust_id = session.get("customer_id")
+    conn = db.get_db()
+    customer = conn.execute("SELECT * FROM customers WHERE id = ?", (cust_id,)).fetchone()
+    if not customer:
+        session.clear()
+        conn.close()
+        return redirect(url_for("customer_login"))
+        
+    tariff = conn.execute("SELECT * FROM tariffs WHERE id = ?", (customer["tariff_id"],)).fetchone() if customer["tariff_id"] else None
+    invoices = conn.execute("SELECT * FROM invoices WHERE customer_id = ? ORDER BY id DESC", (cust_id,)).fetchall()
+    tickets = conn.execute("SELECT * FROM tickets WHERE customer_id = ? ORDER BY id DESC", (cust_id,)).fetchall()
+    conn.close()
+    
+    return render_template("customer_portal.html",
+                           customer=customer,
+                           tariff=tariff,
+                           invoices=invoices,
+                           tickets=tickets)
+
+@app.route("/customer/invoices")
+@customer_login_required
+def customer_invoices():
+    return redirect(url_for("customer_dashboard"))
+
+@app.route("/customer/tickets")
+@customer_login_required
+def customer_tickets():
+    return redirect(url_for("customer_dashboard"))
+
+@app.route("/customer/tickets/new", methods=["POST"])
+@customer_login_required
+def customer_new_ticket():
+    cust_id = session.get("customer_id")
+    subject = (request.form.get("subject") or "Internet Outage / Issue").strip()
+    details = (request.form.get("details") or "").strip()
+    
+    conn = db.get_db()
+    ticket_num = generate_unique_ticket_number(conn)
+    conn.execute("""
+        INSERT INTO tickets (ticket_number, customer_id, subject, details, priority, status, created_at)
+        VALUES (?, ?, ?, ?, 'Medium', 'Open', datetime('now'))
+    """, (ticket_num, cust_id, subject, details))
+    conn.commit()
+    conn.close()
+    
+    flash(f"Support ticket #{ticket_num} submitted to Sabro NOC engineers. Our team has been notified.", "success")
+    return redirect(url_for("customer_dashboard"))
 
 # ================= ERROR HANDLERS =================
 @app.errorhandler(404)
