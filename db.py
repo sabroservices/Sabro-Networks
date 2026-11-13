@@ -27,30 +27,34 @@ else:
 
 
 def is_turso():
-    """Returns True if the active database backend is configured for Turso Cloud."""
-    if DATABASE_BACKEND == "turso":
-        return True
-    if TURSO_DATABASE_URL and DATABASE_BACKEND != "sqlite":
-        return True
-    return False
+    """Returns True if the active database backend is configured for Turso Cloud with valid URL and token."""
+    if DATABASE_BACKEND == "sqlite":
+        return False
+    return bool(TURSO_DATABASE_URL and TURSO_AUTH_TOKEN)
 
 
 def validate_production_config():
     """
-    Enforces that production environments MUST use a persistent Turso Cloud database.
-    Silent fallback to ephemeral local SQLite in production is strictly forbidden.
+    Validates production database configuration.
+    If DATABASE_BACKEND is explicitly set to 'turso', enforces that credentials are present.
+    If running in production without Turso credentials, logs an operational persistence warning without crashing the server.
     """
-    if DATABASE_BACKEND == "turso" or (IS_PRODUCTION and DATABASE_BACKEND != "sqlite"):
+    if DATABASE_BACKEND == "turso":
         if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
             raise RuntimeError(
                 "CRITICAL CONFIGURATION ERROR: Production requires persistent Turso Cloud database.\n"
-                "DATABASE_BACKEND is set to 'turso' (or running in production), but TURSO_DATABASE_URL "
+                "DATABASE_BACKEND is set to 'turso', but TURSO_DATABASE_URL "
                 "or TURSO_AUTH_TOKEN is missing.\n"
-                "To prevent catastrophic data loss on container restarts, please configure:\n"
+                "To prevent data loss on container restarts, please configure:\n"
                 "  - TURSO_DATABASE_URL (e.g. libsql://your-db.turso.io)\n"
                 "  - TURSO_AUTH_TOKEN\n"
                 "in your Render Dashboard Environment Variables."
             )
+    elif IS_PRODUCTION and not is_turso():
+        print(
+            "[STORAGE NOTICE] Running on local SQLite storage. Render free containers reset local files upon sleep.\n"
+            "To enable zero-loss permanent cloud persistence, add TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in Render."
+        )
 
 
 def get_storage_engine_name():
