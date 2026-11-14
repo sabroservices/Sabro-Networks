@@ -4,6 +4,9 @@ import re
 from werkzeug.security import generate_password_hash
 
 # ================= ENVIRONMENT & CONFIGURATION =================
+DEFAULT_TURSO_URL = "https://sabro-networks-sabroservices.aws-ap-south-1.turso.io"
+DEFAULT_TURSO_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTQ2MDk0MDksImlkIjoiMDFhMWQ3MGUtNDMwMS03MWQ5LTgzYzQtODIyZmIxNmExNWJjIiwia2lkIjoidk9rRmhlVXZwNTBJS1I0QjFLM0NiZVBWRXpISTZPM1QxUVFxUDFRU0duRSIsInJpZCI6IjUyYjJlMTI5LThmZmQtNDI1Mi04Zjk3LWZhNDlhMWJmZDQ0NSJ9.oJSIypW26I07XExEHbNsW9erj8BqE1WQi9y-8Ec7L7IwoqlWWMB9v1ffzUbHhuO6AWBNLUWlWrH2dAV5UfgwBg"
+
 DATABASE_BACKEND = os.environ.get("DATABASE_BACKEND", "").lower().strip()
 TURSO_DATABASE_URL = os.environ.get("TURSO_DATABASE_URL", "").strip()
 TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "").strip()
@@ -14,6 +17,25 @@ IS_PRODUCTION = (
     or os.environ.get("RENDER") in ("true", "1", True)
     or os.environ.get("RENDER_SERVICE_ID") is not None
 )
+
+def get_effective_turso_credentials():
+    """Returns (url, token) resolving environment variables and production cloud fallbacks."""
+    backend = os.environ.get("DATABASE_BACKEND", DATABASE_BACKEND).lower().strip()
+    if backend == "sqlite":
+        return "", ""
+    url = os.environ.get("TURSO_DATABASE_URL", TURSO_DATABASE_URL).strip()
+    token = os.environ.get("TURSO_AUTH_TOKEN", TURSO_AUTH_TOKEN).strip()
+    is_prod = (
+        IS_PRODUCTION
+        or os.environ.get("FLASK_ENV") == "production"
+        or os.environ.get("RENDER") in ("true", "1", True)
+        or os.environ.get("RENDER_SERVICE_ID") is not None
+        or os.environ.get("VERCEL") == "1"
+    )
+    if is_prod and not url and not token:
+        url = DEFAULT_TURSO_URL
+        token = DEFAULT_TURSO_TOKEN
+    return url, token
 
 # Local SQLite fallback path (strictly for local dev & testing)
 is_serverless = os.environ.get("VERCEL") == "1" or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") is not None
@@ -29,10 +51,9 @@ else:
 def is_turso():
     """Returns True if the active database backend is configured for Turso Cloud with valid URL and token."""
     backend = os.environ.get("DATABASE_BACKEND", DATABASE_BACKEND).lower().strip()
-    url = os.environ.get("TURSO_DATABASE_URL", TURSO_DATABASE_URL).strip()
-    token = os.environ.get("TURSO_AUTH_TOKEN", TURSO_AUTH_TOKEN).strip()
     if backend == "sqlite":
         return False
+    url, token = get_effective_turso_credentials()
     return bool(url and token)
 
 
@@ -43,10 +64,10 @@ def validate_production_config():
     If running in production without Turso credentials, logs an operational persistence warning without crashing the server.
     """
     backend = os.environ.get("DATABASE_BACKEND", DATABASE_BACKEND).lower().strip()
-    url = os.environ.get("TURSO_DATABASE_URL", TURSO_DATABASE_URL).strip()
-    token = os.environ.get("TURSO_AUTH_TOKEN", TURSO_AUTH_TOKEN).strip()
+    raw_url = os.environ.get("TURSO_DATABASE_URL", TURSO_DATABASE_URL).strip()
+    raw_token = os.environ.get("TURSO_AUTH_TOKEN", TURSO_AUTH_TOKEN).strip()
     if backend == "turso":
-        if not url or not token:
+        if not raw_url or not raw_token:
             raise RuntimeError(
                 "CRITICAL CONFIGURATION ERROR: Production requires persistent Turso Cloud database.\n"
                 "DATABASE_BACKEND is set to 'turso', but TURSO_DATABASE_URL "
@@ -66,7 +87,7 @@ def validate_production_config():
 def get_storage_engine_name():
     """Returns human-readable name of the active storage engine for UI diagnostics."""
     if is_turso():
-        url = os.environ.get("TURSO_DATABASE_URL", TURSO_DATABASE_URL).strip()
+        url, _ = get_effective_turso_credentials()
         masked_url = re.sub(r"://([^@]+)@", "://***@", url) if "@" in url else url
         return f"Turso Cloud SQLite ({masked_url})"
     if os.environ.get("SABRO_DB_PATH"):
@@ -296,8 +317,7 @@ def get_db():
     validate_production_config()
 
     if is_turso():
-        url = os.environ.get("TURSO_DATABASE_URL", TURSO_DATABASE_URL).strip()
-        token = os.environ.get("TURSO_AUTH_TOKEN", TURSO_AUTH_TOKEN).strip()
+        url, token = get_effective_turso_credentials()
         try:
             return LibsqlConn(url, auth_token=token)
         except Exception as e:
