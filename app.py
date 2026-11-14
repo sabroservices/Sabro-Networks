@@ -29,6 +29,7 @@ app = Flask(
 # In serverless (Vercel) environments, a stable default prevents session invalidation across cold starts
 SECRET_KEY = os.environ.get("SECRET_KEY", "sabro-networks-enterprise-stable-session-key-2026")
 app.secret_key = SECRET_KEY
+app.url_map.strict_slashes = False
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax"
@@ -334,9 +335,14 @@ def inject_globals():
 
 @app.before_request
 def require_login():
-    # Allow login, static files, and public invoice print views without authentication
+    # Explicitly whitelist public paths to prevent redirect loops behind reverse proxies (Vercel/Render)
+    raw_path = request.path.rstrip('/')
+    if raw_path in ('/login', '/health', '/customer/login') or raw_path.startswith('/static'):
+        return None
     allowed_endpoints = ['login', 'static', 'print_invoice', 'health_diagnostic', 'customer_login', 'customer_logout', 'customer_dashboard', 'customer_invoices', 'customer_tickets', 'customer_new_ticket']
-    if request.endpoint not in allowed_endpoints and not session.get('user_id'):
+    if request.endpoint in allowed_endpoints:
+        return None
+    if not session.get('user_id'):
         return redirect(url_for('login'))
 
 @app.after_request
