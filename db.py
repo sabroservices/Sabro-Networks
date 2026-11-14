@@ -1,6 +1,8 @@
 import sqlite3
 import os
 import re
+import ssl
+from urllib.parse import urlparse, parse_qs
 from werkzeug.security import generate_password_hash
 
 # ================= ENVIRONMENT & CONFIGURATION =================
@@ -10,6 +12,7 @@ DEFAULT_TURSO_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQi
 DATABASE_BACKEND = os.environ.get("DATABASE_BACKEND", "").lower().strip()
 TURSO_DATABASE_URL = os.environ.get("TURSO_DATABASE_URL", "").strip()
 TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "").strip()
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
 # Production environment detection
 IS_PRODUCTION = (
@@ -18,10 +21,28 @@ IS_PRODUCTION = (
     or os.environ.get("RENDER_SERVICE_ID") is not None
 )
 
+def is_postgres():
+    """Returns True if the active database backend is configured for PostgreSQL / Neon / Hyperdrive."""
+    backend = os.environ.get("DATABASE_BACKEND", DATABASE_BACKEND).lower().strip()
+    if backend in ("postgres", "postgresql", "neon", "hyperdrive"):
+        return True
+    db_url = os.environ.get("DATABASE_URL", DATABASE_URL).strip()
+    return db_url.startswith("postgresql://") or db_url.startswith("postgres://")
+
+def get_effective_postgres_credentials():
+    """Returns PostgreSQL connection string URL."""
+    return (
+        os.environ.get("DATABASE_URL")
+        or os.environ.get("POSTGRES_URL")
+        or os.environ.get("NEON_DATABASE_URL")
+        or os.environ.get("HYPERDRIVE_URL")
+        or DATABASE_URL
+    ).strip()
+
 def get_effective_turso_credentials():
     """Returns (url, token) resolving environment variables and production cloud fallbacks."""
     backend = os.environ.get("DATABASE_BACKEND", DATABASE_BACKEND).lower().strip()
-    if backend == "sqlite":
+    if backend in ("sqlite", "postgres", "postgresql", "neon", "hyperdrive"):
         return "", ""
     url = os.environ.get("TURSO_DATABASE_URL", TURSO_DATABASE_URL).strip()
     token = os.environ.get("TURSO_AUTH_TOKEN", TURSO_AUTH_TOKEN).strip()
@@ -32,7 +53,7 @@ def get_effective_turso_credentials():
         or os.environ.get("RENDER_SERVICE_ID") is not None
         or os.environ.get("VERCEL") == "1"
     )
-    if is_prod and not url and not token:
+    if is_prod and not url and not token and not is_postgres():
         url = DEFAULT_TURSO_URL
         token = DEFAULT_TURSO_TOKEN
     return url, token
@@ -50,6 +71,8 @@ else:
 
 def is_turso():
     """Returns True if the active database backend is configured for Turso Cloud with valid URL and token."""
+    if is_postgres():
+        return False
     backend = os.environ.get("DATABASE_BACKEND", DATABASE_BACKEND).lower().strip()
     if backend == "sqlite":
         return False
@@ -60,10 +83,19 @@ def is_turso():
 def validate_production_config():
     """
     Validates production database configuration.
-    If DATABASE_BACKEND is explicitly set to 'turso', enforces that credentials are present.
-    If running in production without Turso credentials, logs an operational persistence warning without crashing the server.
+    Enforces persistent database connectivity in production to prevent data loss.
     """
     backend = os.environ.get("DATABASE_BACKEND", DATABASE_BACKEND).lower().strip()
+    if is_postgres():
+        pg_url = get_effective_postgres_credentials()
+        if not pg_url:
+            raise RuntimeError(
+                "CRITICAL CONFIGURATION ERROR: Production requires persistent Neon PostgreSQL / Cloudflare Hyperdrive database.\n"
+                "DATABASE_BACKEND is set to PostgreSQL/Neon, but DATABASE_URL is missing.\n"
+                "Please configure DATABASE_URL in your deployment environment variables."
+            )
+        return
+
     raw_url = os.environ.get("TURSO_DATABASE_URL", TURSO_DATABASE_URL).strip()
     raw_token = os.environ.get("TURSO_AUTH_TOKEN", TURSO_AUTH_TOKEN).strip()
     if backend == "turso":
@@ -77,15 +109,19 @@ def validate_production_config():
                 "  - TURSO_AUTH_TOKEN\n"
                 "in your Render Dashboard Environment Variables."
             )
-    elif IS_PRODUCTION and not is_turso():
+    elif IS_PRODUCTION and not is_turso() and not is_postgres():
         print(
-            "[STORAGE NOTICE] Running on local SQLite storage. Render free containers reset local files upon sleep.\n"
-            "To enable zero-loss permanent cloud persistence, add TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in Render."
+            "[STORAGE NOTICE] Running on local SQLite storage. Render/Serverless containers reset local files upon sleep.\n"
+            "To enable permanent cloud persistence, configure Neon PostgreSQL (DATABASE_URL) or Turso Cloud (TURSO_DATABASE_URL)."
         )
 
 
 def get_storage_engine_name():
     """Returns human-readable name of the active storage engine for UI diagnostics."""
+    if is_postgres():
+        url = get_effective_postgres_credentials()
+        masked_url = re.sub(r"://([^@]+)@", "://***@", url) if "@" in url else url
+        return f"Neon PostgreSQL via Cloudflare Hyperdrive ({masked_url})"
     if is_turso():
         url, _ = get_effective_turso_credentials()
         masked_url = re.sub(r"://([^@]+)@", "://***@", url) if "@" in url else url
@@ -93,6 +129,306 @@ def get_storage_engine_name():
     if os.environ.get("SABRO_DB_PATH"):
         return f"Persistent Mounted Disk ({DB_PATH})"
     return "Local SQLite Storage (sabro_isp.db)"
+
+
+# ================= QUERY TRANSLATOR (SQLITE <-> POSTGRESQL) =================
+def translate_sqlite_to_postgres(sql):
+    """
+    Transparently translates SQLite SQL dialect into PostgreSQL standard SQL:
+      - ? -> %s placeholder conversion outside string literals
+      - date('now', '+N days') -> (CURRENT_DATE + INTERVAL 'N days')::text
+      - date('now') -> CURRENT_DATE::text
+      - datetime('now') -> CURRENT_TIMESTAMP::text
+      - date(col) -> substr(col, 1, 10)
+      - strftime('%Y-%m', col) -> substr(col, 1, 7)
+      - INSERT OR IGNORE INTO -> INSERT INTO ... ON CONFLICT DO NOTHING
+      - PRAGMA table_info(t) -> SELECT ordinal_position - 1, column_name, data_type, 0, NULL, 0 FROM information_schema.columns...
+      - sqlite_master -> information_schema.tables
+      - AUTOINCREMENT -> SERIAL
+    """
+    s = sql.strip()
+
+    # 1. INSERT OR IGNORE INTO
+    if re.search(r'INSERT\s+OR\s+IGNORE\s+INTO', s, re.IGNORECASE):
+        s = re.sub(r'INSERT\s+OR\s+IGNORE\s+INTO', 'INSERT INTO', s, flags=re.IGNORECASE)
+        if not re.search(r'ON\s+CONFLICT', s, re.IGNORECASE):
+            s = s.rstrip(';') + ' ON CONFLICT DO NOTHING'
+
+    # 2. Date expressions
+    s = re.sub(r"date\(\s*['\"]now['\"]\s*,\s*['\"]\+([0-9]+)\s*days['\"]\s*\)", r"(CURRENT_DATE + INTERVAL '\\1 days')::text", s, flags=re.IGNORECASE)
+    s = re.sub(r"date\(\s*['\"]now['\"]\s*\)", "CURRENT_DATE::text", s, flags=re.IGNORECASE)
+    s = re.sub(r"datetime\(\s*['\"]now['\"]\s*\)", "CURRENT_TIMESTAMP::text", s, flags=re.IGNORECASE)
+    s = re.sub(r"date\(\s*([a-zA-Z0-9_.]+)\s*\)", r"substr(\1, 1, 10)", s, flags=re.IGNORECASE)
+    s = re.sub(r"strftime\(\s*['\"]%Y-%m['\"]\s*,\s*([a-zA-Z0-9_.]+)\s*\)", r"substr(\1, 1, 7)", s, flags=re.IGNORECASE)
+
+    # 3. PRAGMA table_info
+    m = re.match(r"PRAGMA\s+table_info\((['\"]?)([a-zA-Z0-9_]+)\1\)", s, re.IGNORECASE)
+    if m:
+        tbl = m.group(2)
+        s = f"SELECT ordinal_position - 1, column_name, data_type, 0, NULL, 0 FROM information_schema.columns WHERE table_name = '{tbl}' ORDER BY ordinal_position"
+
+    # 4. sqlite_master table queries
+    s = re.sub(r"FROM\s+sqlite_master\s+WHERE\s+type=['\"]table['\"]\s+AND\s+name\s+NOT\s+LIKE\s+['\"]sqlite_%['\"]",
+               "FROM information_schema.tables WHERE table_schema = 'public'", s, flags=re.IGNORECASE)
+    # 5. DDL AUTOINCREMENT -> SERIAL
+    s = re.sub(r'INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT', 'SERIAL PRIMARY KEY', s, flags=re.IGNORECASE)
+
+    # 6. Replace ? with %s outside quotes
+    tokens = []
+    in_quote = False
+    quote_char = None
+    i = 0
+    while i < len(s):
+        c = s[i]
+        if in_quote:
+            tokens.append(c)
+            if c == quote_char:
+                if i + 1 < len(s) and s[i+1] == quote_char:
+                    tokens.append(s[i+1])
+                    i += 1
+                else:
+                    in_quote = False
+        else:
+            if c in ("'", '"'):
+                in_quote = True
+                quote_char = c
+                tokens.append(c)
+            elif c == '?':
+                tokens.append('%s')
+            else:
+                tokens.append(c)
+        i += 1
+    return "".join(tokens)
+
+
+# ================= POSTGRESQL / PG8000 ADAPTER LAYER =================
+class PostgresRow:
+    """
+    Provides full sqlite3.Row and LibsqlRow compatibility for PostgreSQL result rows:
+      - Positional integer indexing: row[0], row[1]
+      - Named dictionary access: row['username'], row['price']
+      - Case-insensitive fallback lookup
+      - Dictionary methods: keys(), values(), items(), get()
+      - 'col' in row membership testing
+      - Iterable over values: list(row), tuple(row)
+      - len(row)
+    """
+    def __init__(self, cols, values):
+        self._col_list = [str(c) for c in cols]
+        self._col_map = {c: i for i, c in enumerate(self._col_list)}
+        self._lower_map = {c.lower(): i for i, c in enumerate(self._col_list)}
+        self._values = list(values)
+
+    def __getitem__(self, item):
+        if isinstance(item, int):
+            return self._values[item]
+        if item in self._col_map:
+            return self._values[self._col_map[item]]
+        lower = str(item).lower()
+        if lower in self._lower_map:
+            return self._values[self._lower_map[lower]]
+        raise KeyError(item)
+
+    def keys(self):
+        return list(self._col_list)
+
+    def values(self):
+        return list(self._values)
+
+    def items(self):
+        return [(c, self._values[i]) for c, i in self._col_map.items()]
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except (KeyError, IndexError):
+            return default
+
+    def __contains__(self, key):
+        return key in self._col_map or str(key).lower() in self._lower_map
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __len__(self):
+        return len(self._values)
+
+    def __repr__(self):
+        return f"PostgresRow({dict(self.items())})"
+
+
+class PostgresCursor:
+    """
+    Provides standard DB-API 2.0 cursor wrapping pg8000 cursor.
+    Translates query parameters and captures lastrowid via RETURNING id.
+    """
+    def __init__(self, conn, real_cursor):
+        self.conn = conn
+        self.cur = real_cursor
+        self.lastrowid = None
+        self.rowcount = 0
+        self._columns = []
+        self._rows = []
+        self._idx = 0
+
+    def execute(self, sql, params=None):
+        translated = translate_sqlite_to_postgres(sql)
+        p = list(params) if params is not None else []
+        
+        is_insert = translated.strip().upper().startswith("INSERT INTO")
+        has_returning = "RETURNING" in translated.upper()
+
+        if is_insert and not has_returning:
+            sql_with_returning = translated.rstrip(";") + " RETURNING id;"
+            try:
+                self.cur.execute(sql_with_returning, p)
+                row = self.cur.fetchone()
+                if row:
+                    self.lastrowid = row[0]
+                self.rowcount = self.cur.rowcount
+                if self.cur.description:
+                    self._columns = [desc[0] for desc in self.cur.description]
+                self._rows = []
+                self._idx = 0
+                return self
+            except Exception:
+                try:
+                    self.conn.rollback()
+                except Exception:
+                    pass
+
+        self.cur.execute(translated, p)
+        self.rowcount = self.cur.rowcount
+        if self.cur.description:
+            self._columns = [desc[0] for desc in self.cur.description]
+            try:
+                self._rows = self.cur.fetchall()
+            except Exception:
+                self._rows = []
+        else:
+            self._rows = []
+        self._idx = 0
+        return self
+
+    def executemany(self, sql, seq_of_params):
+        translated = translate_sqlite_to_postgres(sql)
+        total = 0
+        for p in seq_of_params:
+            self.execute(sql, p)
+            total += (self.rowcount or 0)
+        self.rowcount = total
+        return self
+
+    def fetchone(self):
+        if self._idx < len(self._rows):
+            r = self._rows[self._idx]
+            self._idx += 1
+            return PostgresRow(self._columns, r)
+        return None
+
+    def fetchall(self):
+        r = [PostgresRow(self._columns, row) for row in self._rows[self._idx:]]
+        self._idx = len(self._rows)
+        return r
+
+    def fetchmany(self, size=None):
+        if size is None:
+            size = 1
+        end = min(self._idx + size, len(self._rows))
+        res = [PostgresRow(self._columns, row) for row in self._rows[self._idx:end]]
+        self._idx = end
+        return res
+
+    def __iter__(self):
+        while True:
+            r = self.fetchone()
+            if r is None:
+                break
+            yield r
+
+    def close(self):
+        try:
+            self.cur.close()
+        except Exception:
+            pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+
+class PostgresConn:
+    """
+    Provides standard DB-API 2.0 connection wrapper for PostgreSQL / Neon / Hyperdrive
+    using pure Python pg8000 (100% compatible with Cloudflare Python Workers).
+    """
+    def __init__(self, connection_url):
+        import pg8000.dbapi
+        self.url = connection_url
+        p = urlparse(connection_url)
+        user = p.username or "postgres"
+        password = p.password or ""
+        host = p.hostname or "localhost"
+        port = p.port or 5432
+        database = p.path.lstrip("/") or "postgres"
+        query_params = parse_qs(p.query)
+        sslmode = query_params.get("sslmode", [""])[0].lower()
+
+        ssl_ctx = None
+        if (
+            sslmode in ("require", "verify-ca", "verify-full")
+            or "neon.tech" in host
+            or "aws" in host
+            or "cloudflarestorage" in host
+            or "hyperdrive" in host
+            or os.environ.get("VERCEL") == "1"
+            or IS_PRODUCTION
+        ):
+            ssl_ctx = ssl.create_default_context()
+
+        self.conn = pg8000.dbapi.connect(
+            user=user,
+            password=password,
+            host=host,
+            port=port,
+            database=database,
+            ssl_context=ssl_ctx
+        )
+        self.row_factory = PostgresRow
+
+    def cursor(self):
+        return PostgresCursor(self, self.conn.cursor())
+
+    def execute(self, sql, params=None):
+        cur = self.cursor()
+        return cur.execute(sql, params)
+
+    def executemany(self, sql, seq_of_params):
+        cur = self.cursor()
+        return cur.executemany(sql, seq_of_params)
+
+    def commit(self):
+        self.conn.commit()
+
+    def rollback(self):
+        self.conn.rollback()
+
+    def close(self):
+        try:
+            self.conn.close()
+        except Exception:
+            pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.rollback()
+        else:
+            self.commit()
 
 
 # ================= TURSO / LIBSQL ADAPTER LAYER =================
@@ -245,8 +581,7 @@ class LibsqlConn:
                 url = url_str
         self.client = libsql_client.create_client_sync(url, auth_token=auth_token)
         self._txn = None
-        self.row_factory = LibsqlRow  # compatibility marker
-        # Enable foreign key enforcement
+        self.row_factory = LibsqlRow
         try:
             self.client.execute("PRAGMA foreign_keys = ON;")
         except Exception as e:
@@ -311,10 +646,23 @@ class LibsqlConn:
 def get_db():
     """
     Central database connection provider.
+    Connects to Neon PostgreSQL via Cloudflare Hyperdrive when configured.
     Connects to Turso Cloud when configured or required by production.
     Falls back to local SQLite only when explicitly in local development/testing.
     """
     validate_production_config()
+
+    if is_postgres():
+        url = get_effective_postgres_credentials()
+        try:
+            return PostgresConn(url)
+        except Exception as e:
+            if IS_PRODUCTION or os.environ.get("DATABASE_BACKEND", DATABASE_BACKEND) in ("postgres", "postgresql", "neon", "hyperdrive"):
+                raise RuntimeError(
+                    f"CRITICAL: Failed to connect to PostgreSQL/Neon database ({url}): {e}.\n"
+                    "Ephemeral SQLite fallback is strictly blocked in production to prevent data loss."
+                ) from e
+            print(f"[POSTGRES WARNING] Local development fallback to SQLite due to connection error: {e}")
 
     if is_turso():
         url, token = get_effective_turso_credentials()
@@ -349,11 +697,12 @@ def get_db():
 def safe_backup_to_file(dest_path):
     """
     Safely creates a consistent, atomic binary SQLite database snapshot at dest_path.
-    Works seamlessly with both Turso Cloud and local SQLite.
+    Works seamlessly with PostgreSQL, Turso Cloud, and local SQLite.
     """
-    if is_turso():
-        source_conn = get_db()
-        dest_conn = sqlite3.connect(dest_path)
+    source_conn = get_db()
+    dest_conn = sqlite3.connect(dest_path)
+
+    if is_postgres() or is_turso():
         tables = [
             r[0] for r in source_conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
@@ -376,8 +725,6 @@ def safe_backup_to_file(dest_path):
         source_conn.close()
         return dest_path
     else:
-        source_conn = get_db()
-        dest_conn = sqlite3.connect(dest_path)
         with dest_conn:
             source_conn.backup(dest_conn)
         dest_conn.close()
@@ -386,10 +733,11 @@ def safe_backup_to_file(dest_path):
 
 
 # ================= SCHEMA INITIALIZATION & MIGRATIONS =================
-def init_db(force_reset=False):
+def init_db(force_reset=False, seed_tariffs=False):
     """
     Initializes the database schema safely.
     Preserves all existing tables, columns, indexes, and records.
+    Pre-seeds standard high-speed FTTH packages (Sparko, Veloza, Nexora, Zentro, Voltra, Astrix, Maxora).
     Never runs destructive operations unless force_reset=True is explicitly passed in non-production.
     """
     validate_production_config()
@@ -397,7 +745,7 @@ def init_db(force_reset=False):
     if force_reset:
         if IS_PRODUCTION:
             raise RuntimeError("DESTRUCTIVE ACTION BLOCKED: Cannot force reset database in production!")
-        if not is_turso() and os.path.exists(DB_PATH):
+        if not is_turso() and not is_postgres() and os.path.exists(DB_PATH):
             try:
                 os.remove(DB_PATH)
             except Exception:
@@ -468,6 +816,18 @@ def init_db(force_reset=False):
         fiber_core TEXT DEFAULT '',
         cnic TEXT DEFAULT '',
         installation_date TEXT,
+        lat REAL DEFAULT 0.0,
+        lng REAL DEFAULT 0.0,
+        street TEXT DEFAULT '',
+        house_no TEXT DEFAULT '',
+        whatsapp TEXT DEFAULT '',
+        monthly_fee REAL DEFAULT 0.0,
+        activation_date TEXT DEFAULT '',
+        onu_mac TEXT DEFAULT '',
+        router_model TEXT DEFAULT '',
+        olt_id INTEGER,
+        splitter_id INTEGER,
+        notes TEXT DEFAULT '',
         created_at TEXT,
         FOREIGN KEY (tariff_id) REFERENCES tariffs (id)
     )
@@ -511,6 +871,11 @@ def init_db(force_reset=False):
         paid_date TEXT,
         payment_method TEXT, -- Cash, JazzCash, EasyPaisa, Bank Transfer
         collected_by_staff_id INTEGER,
+        paid_amount REAL DEFAULT 0.0,
+        balance_due REAL DEFAULT 0.0,
+        discount REAL DEFAULT 0.0,
+        additional_charges REAL DEFAULT 0.0,
+        notes TEXT DEFAULT '',
         created_at TEXT,
         FOREIGN KEY (customer_id) REFERENCES customers (id),
         FOREIGN KEY (collected_by_staff_id) REFERENCES users (id)
@@ -791,7 +1156,7 @@ def init_db(force_reset=False):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory_items(category);")
     conn.commit()
 
-    # 12. Default System Settings
+    # 16. Default System Settings
     default_settings = [
         ("isp_name", "Sabro Networks"),
         ("tagline", "FTTH High-Speed Fiber Internet"),
@@ -810,7 +1175,11 @@ def init_db(force_reset=False):
     for k, v in default_settings:
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?);", (k, v))
 
-    # 13. Ensure Single Main Admin exists if database has 0 users
+    # 17. Pre-Seed Standard ISP Tariff Packages
+    if not force_reset and (seed_tariffs or os.environ.get("SEED_TARIFFS") == "1"):
+        seed_standard_tariffs(conn)
+
+    # 18. Ensure Single Main Admin exists if database has 0 users
     user_count = cursor.execute("SELECT COUNT(*) FROM users;").fetchone()[0]
     if user_count == 0:
         admin_username = os.environ.get("ADMIN_USERNAME", "ahmedbaloch").strip() or "ahmedbaloch"
@@ -823,6 +1192,32 @@ def init_db(force_reset=False):
 
     conn.commit()
     conn.close()
+
+
+def seed_standard_tariffs(conn=None):
+    """Seeds standard high-speed FTTH packages (Sparko, Veloza, Nexora, Zentro, Voltra, Astrix, Maxora)."""
+    close_after = False
+    if conn is None:
+        conn = get_db()
+        close_after = True
+    cursor = conn.cursor()
+    standard_tariffs = [
+        ("Sparko", 5, 1200.0, "Starter 5 Mbps FTTH package for basic browsing & messaging"),
+        ("Veloza", 15, 1800.0, "Fast 15 Mbps fiber package for streaming and family usage"),
+        ("Nexora", 20, 2200.0, "Ultra-smooth 20 Mbps fiber connection for HD streaming and work-from-home"),
+        ("Zentro", 25, 2800.0, "High performance 25 Mbps broadband for multi-device households"),
+        ("Voltra", 35, 3500.0, "Power user 35 Mbps lightning fiber for heavy downloading and gaming"),
+        ("Astrix", 50, 4800.0, "Premium 50 Mbps low-latency dedicated optical package for creators & streamers"),
+        ("Maxora", 75, 6500.0, "Ultimate 75 Mbps Gigabit-class business & power user FTTH connection"),
+    ]
+    for name, speed, price, desc in standard_tariffs:
+        cursor.execute("""
+            INSERT OR IGNORE INTO tariffs (name, speed_mb, price, description)
+            VALUES (?, ?, ?, ?)
+        """, (name, speed, price, desc))
+    conn.commit()
+    if close_after:
+        conn.close()
 
 
 if __name__ == "__main__":

@@ -2625,7 +2625,16 @@ def dealer_sync_run():
     if res["success"]:
         flash(f"Sync Successful! Scanned {res['total_scanned']} accounts: {res['updated_count']} renewed/updated, {res['created_count']} newly provisioned.", "success")
     else:
-        flash(f"Sync notice: {res.get('message', 'No changes recorded.')}", "warning")
+        conn = db.get_db()
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute("""
+            INSERT INTO dealer_sync_logs (sync_time, source, status, total_scanned, updated_count, created_count, details)
+            VALUES (?, 'Live Connect Portal Pull', 'Unavailable', 0, 0, 0, 'Integration Unavailable — Manual Verification Required.')
+        """, (now_str,))
+        conn.execute("UPDATE dealer_sync_config SET last_sync_time = ?, last_sync_status = 'Integration Unavailable — Manual Verification Required.' WHERE id = 1", (now_str,))
+        conn.commit()
+        conn.close()
+        flash("Integration Unavailable — Manual Verification Required. Upstream dealer portal could not be reached. Please use CSV/Excel upload for offline ingestion.", "warning")
         
     return redirect(url_for("dealer_sync_page"))
 

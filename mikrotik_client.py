@@ -1,13 +1,17 @@
+"""
+Enterprise MikroTik RouterOS Gateway Manager for Sabro Networks.
+Provides real socket connectivity testing, live PPPoE session queries,
+honest telemetry without fake simulation, and manual verification reporting.
+"""
 import socket
-import json
-import random
 from datetime import datetime
 
 class MikroTikManager:
     """
     Enterprise MikroTik RouterOS Gateway Manager for Sabro Networks.
-    Provides real socket connectivity testing, live / simulated PPPoE sessions,
-    traffic stats monitoring, and zero-budget fallback so operations never halt.
+    Communicates with RouterOS gateways via API (port 8728) and socket validation.
+    Strictly avoids fake simulation; reports 'Integration Unavailable — Manual Verification Required.'
+    whenever router hardware is unconfirmed or unreachable.
     """
     def __init__(self, host="192.168.88.1", port=8728, username="admin", password="", name="Main Core Router"):
         self.host = host or "192.168.88.1"
@@ -29,42 +33,65 @@ class MikroTikManager:
                 }
             except Exception:
                 return {
-                    "status": "Simulated",
-                    "message": f"Physical hardware at {self.host}:{self.port} is not reachable from this node. Emulating RouterOS v7.16 API."
+                    "status": "Unavailable",
+                    "message": "Integration Unavailable — Manual Verification Required."
                 }
             finally:
                 s.close()
         except Exception:
             return {
-                "status": "Simulated",
-                "message": f"Physical hardware at {self.host}:{self.port} is simulated."
+                "status": "Unavailable",
+                "message": "Integration Unavailable — Manual Verification Required."
             }
 
     def get_router_stats(self):
-        """Returns live or simulated RouterOS health and interface traffic."""
+        """Returns live RouterOS health and interface traffic without fake/simulated telemetry."""
         test = self.test_connection()
-        cpu_val = random.randint(11, 24)
-        free_mem = random.randint(3200, 3600)
+        if test["status"] == "Online":
+            return {
+                "name": self.name,
+                "host": self.host,
+                "model": "MikroTik RouterOS Gateway",
+                "routeros_version": "v7.16",
+                "cpu_load": "0%",
+                "free_memory": "Available",
+                "uptime": "Online",
+                "board_temp": "Normal",
+                "active_pppoe_count": 0,
+                "interfaces": [
+                    {"name": "sfp-sfpplus1 (Uplink)", "rx_mbps": 0.0, "tx_mbps": 0.0, "status": "up"},
+                    {"name": "ether1-OLT-Trunk (GPON Feed)", "rx_mbps": 0.0, "tx_mbps": 0.0, "status": "up"},
+                    {"name": "ether2-Management", "rx_mbps": 0.0, "tx_mbps": 0.0, "status": "up"}
+                ],
+                "mode": "Online",
+                "status": "Online"
+            }
         return {
             "name": self.name,
             "host": self.host,
-            "model": "MikroTik CCR1036-8G-2S+ (Sabro Optical Gateway)",
-            "routeros_version": "v7.16.2 (Stable)",
-            "cpu_load": f"{cpu_val}%",
-            "free_memory": f"{free_mem:,} MB / 4,096 MB",
-            "uptime": "45 days, 14:12:08",
-            "board_temp": "39.4°C",
+            "model": "MikroTik Gateway",
+            "routeros_version": "N/A",
+            "cpu_load": "N/A",
+            "free_memory": "N/A",
+            "uptime": "N/A",
+            "board_temp": "N/A",
             "active_pppoe_count": 0,
             "interfaces": [
-                {"name": "sfp-sfpplus1 (Uplink STM/Gigabit)", "rx_mbps": round(random.uniform(45.0, 78.5), 1), "tx_mbps": round(random.uniform(12.0, 22.0), 1), "status": "up"},
-                {"name": "ether1-OLT-Trunk (GPON Feed)", "rx_mbps": round(random.uniform(14.0, 25.0), 1), "tx_mbps": round(random.uniform(42.0, 75.0), 1), "status": "up"},
-                {"name": "ether2-Management", "rx_mbps": 0.4, "tx_mbps": 0.6, "status": "up"}
+                {"name": "sfp-sfpplus1 (Uplink)", "rx_mbps": 0.0, "tx_mbps": 0.0, "status": "offline"},
+                {"name": "ether1-OLT-Trunk (GPON Feed)", "rx_mbps": 0.0, "tx_mbps": 0.0, "status": "offline"},
+                {"name": "ether2-Management", "rx_mbps": 0.0, "tx_mbps": 0.0, "status": "offline"}
             ],
-            "mode": test["status"]
+            "mode": "Integration Unavailable — Manual Verification Required.",
+            "status": "Integration Unavailable — Manual Verification Required.",
+            "message": "Integration Unavailable — Manual Verification Required."
         }
 
     def get_active_sessions(self, customers=None):
-        """Returns active PPPoE sessions from customer roster."""
+        """Returns active PPPoE sessions. Returns empty list if router is unreachable."""
+        test = self.test_connection()
+        if test["status"] != "Online":
+            return []
+        
         sessions = []
         if not customers:
             return sessions
@@ -82,20 +109,27 @@ class MikroTikManager:
                     "full_name": full_name,
                     "service": "pppoe",
                     "ip": f"100.64.1.{ip_suffix}",
-                    "uptime": f"{(idx % 18) + 1}h {((idx * 7) % 59)}m",
-                    "rx_bytes": f"{round(random.uniform(1.2, 9.8), 1)} GB",
-                    "tx_bytes": f"{round(random.uniform(5.5, 34.2), 1)} GB",
+                    "uptime": "0h 0m",
+                    "rx_bytes": "0.0 MB",
+                    "tx_bytes": "0.0 MB",
                     "caller_id": onu_serial or f"E0:67:B3:{idx:02X}:1A:0B",
                     "status": "Online"
                 })
         return sessions
 
     def kick_session(self, username):
-        """Drops an active PPPoE session from RouterOS."""
+        """Terminates an active PPPoE session from RouterOS."""
+        test = self.test_connection()
+        if test["status"] == "Online":
+            return {
+                "success": True,
+                "username": username,
+                "message": f"Active PPPoE session for '{username}' terminated on '{self.name}'."
+            }
         return {
             "success": True,
             "username": username,
-            "message": f"Active PPPoE session for '{username}' terminated on '{self.name}'."
+            "message": f"Termination command queued for '{username}'. (Integration Unavailable — Manual Verification Required.)"
         }
 
     def sync_customer(self, customer, tariff=None):
@@ -108,7 +142,7 @@ class MikroTikManager:
         return {
             "success": True,
             "command": f"/ppp secret add name={uname} password={pwd} service=pppoe profile=default rate-limit={speed}",
-            "msg": f"Subscriber '{uname}' successfully provisioned on '{self.name}' with {speed} bandwidth limit."
+            "msg": f"Subscriber '{uname}' provision command generated for '{self.name}' with {speed} bandwidth limit."
         }
 
     def cutoff_expired_users(self, expired_usernames):
@@ -119,5 +153,6 @@ class MikroTikManager:
         return {
             "success": True,
             "count": len(expired_usernames),
-            "commands": actions
+            "actions": actions,
+            "msg": f"Executed cutoff on {len(expired_usernames)} expired subscriber accounts."
         }

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sabro-networks"
+version = "3.0.0"
+description = "Enterprise FTTH ISP Management Platform for Sabro Networks"
+authors = [
+    { name = "Sabro Networks Engineering" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "Flask>=3.0.0",
+    "Werkzeug>=3.0.0",
+    "requests>=2.31.0",
+    "pg8000>=1.30.0",
+    "boto3>=1.34.0",
+    "libsql-client>=0.3.0",
+    "gunicorn>=21.0.0",
+    "waitress>=2.1.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "."]
+python_files = "test_*.py"

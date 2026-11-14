@@ -1,3 +1,5 @@
+from unittest.mock import patch
+import dealer_client
 import unittest
 import os
 import io
@@ -119,8 +121,31 @@ class TestDealerSyncSuite(unittest.TestCase):
         self.logout()
         print("  [PASS] Dealer Sync 03 - Connection Diagnostic Endpoint Verified.")
 
-    def test_04_live_reconciliation_pull(self):
+    @patch.object(dealer_client.ConnectDealerClient, "pull_subscribers")
+    def test_04_live_reconciliation_pull(self, mock_pull):
         """Verify automated pull and reconciliation against existing and new accounts."""
+        mock_pull.return_value = [
+            {
+                "pppoe_username": "exist.user",
+                "password": "secret_updated",
+                "full_name": "Existing Subscriber",
+                "phone": "0300-1122334",
+                "tariff_name": "15 MB Plan",
+                "expiry_date": "2026-12-31",
+                "status": "Active",
+                "area": "Sector A"
+            },
+            {
+                "pppoe_username": "tahir.connect",
+                "password": "connect_pass",
+                "full_name": "Tahir Farooq",
+                "phone": "0321-9988771",
+                "tariff_name": "15 MB Plan",
+                "expiry_date": "2026-12-30",
+                "status": "Active",
+                "area": "Sector B"
+            }
+        ]
         self.login("admin", "admin123")
         
         # Capture existing hardware specs of an active customer
@@ -183,6 +208,21 @@ farhan.speed,pass998,Farhan Akhtar,0312-3344556,15 MB FTTH Plan,2026-11-30,Activ
 
         self.logout()
         print("  [PASS] Dealer Sync 05 - CSV/Excel Sheet Ingestion & Subscriber Provisioning Verified.")
+
+
+    def test_06_unreachable_upstream_returns_manual_verification_required(self):
+        """Verify unreachable upstream portal records 'Integration Unavailable — Manual Verification Required.'"""
+        self.login("admin", "admin123")
+        res = self.client.post("/dealer/sync/run", follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b"Integration Unavailable", res.data)
+        conn = db.get_db()
+        log = conn.execute("SELECT * FROM dealer_sync_logs WHERE status = 'Unavailable' ORDER BY id DESC LIMIT 1").fetchone()
+        conn.close()
+        self.assertIsNotNone(log)
+        self.assertIn("Integration Unavailable — Manual Verification Required.", log["details"])
+        self.logout()
+        print("  [PASS] Dealer Sync 06 - Honest Unavailability Logging Verified.")
 
 if __name__ == "__main__":
     unittest.main()

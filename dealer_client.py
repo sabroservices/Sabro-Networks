@@ -28,39 +28,43 @@ class ConnectDealerClient:
         if not self.username:
             return {
                 "success": False,
-                "status": "Missing Credentials",
-                "message": "Dealer portal username has not been configured. Please enter your dealer username."
+                "status": "Unavailable",
+                "message": "Integration Unavailable — Manual Verification Required. Dealer portal username has not been configured."
             }
 
         try:
             # Check portal reachability with short timeout
             resp = self.session.get(self.portal_url, timeout=3.5, allow_redirects=True)
+            if resp.status_code < 400:
+                return {
+                    "success": True,
+                    "status": "Online",
+                    "message": f"Successfully reached Dealer Portal at {self.portal_url} (HTTP {resp.status_code}). Ready to authenticate."
+                }
             return {
-                "success": True,
-                "status": "Online",
-                "message": f"Successfully reached Dealer Portal at {self.portal_url} (HTTP {resp.status_code}). Ready to authenticate."
+                "success": False,
+                "status": "Unavailable",
+                "message": "Integration Unavailable — Manual Verification Required."
             }
-        except Exception as e:
+        except Exception:
             return {
-                "success": True,
-                "status": "Connected (Simulation Ready)",
-                "message": f"Dealer portal URL configured ({self.portal_url}). If live upstream portal requires private ISP VPN/intranet, Sabro Networks fallback engine will ingest and reconcile your dealer data flawlessly."
+                "success": False,
+                "status": "Unavailable",
+                "message": "Integration Unavailable — Manual Verification Required."
             }
 
-    def pull_subscribers(self):
+    def pull_subscribers(self, fallback_stream=None):
         """
         Connects to the dealer portal session, logs in, and fetches the subscriber list.
-        If the external server is unreachable (e.g. running on local machine without
-        an active upstream Connect ISP intranet connection), returns a high-fidelity
-        Connect Communications dealer subscriber dataset matching your configured franchise.
+        Never generates simulated or fake accounts.
+        If the external server is unreachable or unconfigured, returns fallback_stream or empty list.
         """
         # Try live HTTP authentication first
         live_data = self._try_live_portal_pull()
         if live_data:
             return live_data
 
-        # Fallback to realistic Connect Communications Dealer subscriber stream
-        return self._generate_connect_dealer_stream()
+        return fallback_stream or []
 
     def _try_live_portal_pull(self):
         """Attempts live web session login and subscriber table extraction."""
@@ -114,56 +118,6 @@ class ConnectDealerClient:
                         "status": cols[6] if len(cols) > 6 else "Active"
                     })
         return subscribers if subscribers else None
-
-    def _generate_connect_dealer_stream(self):
-        """
-        Generates realistic Connect Communications Dealer subscriber data matching
-        Pakistani FTTH naming, speeds (5M, 15M, 20M, 25M), and current expiry dates.
-        """
-        now = datetime.now()
-        conn = db.get_db()
-        existing_custs = conn.execute("SELECT pppoe_username, full_name, phone, expiry_date, status FROM customers").fetchall()
-        conn.close()
-
-        stream = []
-        # 1. Include current customers with potential renewed expiries from upstream
-        for i, c in enumerate(existing_custs):
-            # Simulate real-world dealer renewal: if expired, dealer renewed for +30 days
-            new_expiry = (now + timedelta(days=28 + (i % 5))).strftime("%Y-%m-%d") if c["status"] == "Expired" else c["expiry_date"]
-            new_status = "Active" if c["status"] == "Expired" else c["status"]
-            
-            stream.append({
-                "pppoe_username": c["pppoe_username"],
-                "password": "ftth" + str(100 + i),
-                "full_name": c["full_name"],
-                "phone": c["phone"] or "0300-1234567",
-                "tariff_name": "15 MB FTTH Plan" if i % 2 == 0 else "20 MB FTTH Plan",
-                "expiry_date": new_expiry,
-                "status": new_status,
-                "area": "Sector A" if i % 2 == 0 else "Sector B"
-            })
-
-        # 2. Plus fresh new accounts provisioned on Connect Dealer panel
-        new_upstream_accounts = [
-            ("tahir.connect", "Tahir Farooq", "0321-9988771", "20 MB FTTH Plan", (now + timedelta(days=30)).strftime("%Y-%m-%d"), "Active", "Sector B"),
-            ("bilal.ftth", "Bilal Ahmed Qureshi", "0302-4455667", "15 MB FTTH Plan", (now + timedelta(days=29)).strftime("%Y-%m-%d"), "Active", "Sector A"),
-            ("kashan.net", "Kashan Enterprise", "0333-8899001", "25 MB FTTH Plan", (now + timedelta(days=30)).strftime("%Y-%m-%d"), "Active", "Commercial Hub")
-        ]
-        for un, fn, ph, tar, exp, st, ar in new_upstream_accounts:
-            # Only add if not already in existing
-            if not any(c["pppoe_username"] == un for c in existing_custs):
-                stream.append({
-                    "pppoe_username": un,
-                    "password": "connect" + un[:4] + "26",
-                    "full_name": fn,
-                    "phone": ph,
-                    "tariff_name": tar,
-                    "expiry_date": exp,
-                    "status": st,
-                    "area": ar
-                })
-
-        return stream
 
     @staticmethod
     def _normalize_date(date_str):
@@ -303,7 +257,7 @@ def reconcile_dealer_data(subscribers, source_label="Connect Portal Pull"):
     if not subscribers:
         return {
             "success": False,
-            "message": "No subscriber records found to synchronize.",
+            "message": "Integration Unavailable — Manual Verification Required.",
             "total_scanned": 0,
             "updated_count": 0,
             "created_count": 0

@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sabro-networks",
+  "main": "cloudflare/worker.py",
+  "compatibility_date": "2024-04-03",
+  "compatibility_flags": [
+    "python_workers"
+  ],
+  "assets": {
+    "directory": "./static",
+    "binding": "ASSETS"
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "SABRO_HYPERDRIVE_NEON_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "STORAGE_BUCKET",
+      "bucket_name": "sabro-networks-storage"
+    }
+  ],
+  "vars": {
+    "DATABASE_BACKEND": "postgres",
+    "CLOUDFLARE_R2_BUCKET_NAME": "sabro-networks-storage",
+    "FLASK_ENV": "production"
+  },
+  "routes": [
+    {
+      "pattern": "portal.sabronetworks.dev/*",
+      "zone_name": "sabronetworks.dev",
+      "custom_domain": true
+    }
+  ]
+}
