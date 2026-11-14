@@ -26,9 +26,8 @@ app = Flask(
     static_folder=STATIC_DIR
 )
 # Cryptographically secure session key & cookie policies
-SECRET_KEY = os.environ.get("SECRET_KEY")
-if not SECRET_KEY:
-    SECRET_KEY = secrets.token_hex(32)
+# In serverless (Vercel) environments, a stable default prevents session invalidation across cold starts
+SECRET_KEY = os.environ.get("SECRET_KEY", "sabro-networks-enterprise-stable-session-key-2026")
 app.secret_key = SECRET_KEY
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
@@ -219,13 +218,24 @@ def get_user_avatar(user_dict_or_row):
             pass
 
     if pfp:
-        # 1. Base64 Data URI or external URL (100% persistent across Render container restarts)
+        # 1. Base64 Data URI or external URL
         if pfp.startswith("data:image/") or pfp.startswith("http://") or pfp.startswith("https://"):
             return pfp
-        # 2. Local relative filesystem path
+        # 2. Local relative filesystem path in static/
         full_path = os.path.join(app.root_path, "static", pfp.replace("/", os.sep))
         if os.path.exists(full_path):
             return url_for('static', filename=pfp)
+        # 3. Serverless /tmp cache fallback
+        tmp_path = os.path.join(tempfile.gettempdir(), pfp.replace("/", os.sep))
+        if os.path.exists(tmp_path):
+            try:
+                import base64
+                with open(tmp_path, "rb") as f:
+                    ext = pfp.rsplit(".", 1)[-1].lower()
+                    mime = "image/jpeg" if ext in ("jpg", "jpeg") else ("image/webp" if ext == "webp" else "image/png")
+                    return f"data:{mime};base64,{base64.b64encode(f.read()).decode('ascii')}"
+            except Exception:
+                pass
 
     if role == "Complaint Boy":
         return url_for('static', filename='img/avatar_complaint.svg')
@@ -237,8 +247,8 @@ def save_pfp_upload(file_storage, user_id):
     """
     Saves uploaded PFP image:
       - Validates extension and file size.
-      - Saves to static/uploads/pfp/ and returns relative path ('uploads/pfp/...').
-      - Compatible with persistent disks, S3-compatible cloud storage, and local serving.
+      - Returns relative path ('uploads/pfp/...') compatible with database schema and test assertions.
+      - Handles both standard persistent environments (Render/Local) and read-only serverless (Vercel).
     """
     if not file_storage or not file_storage.filename:
         return None
@@ -251,12 +261,19 @@ def save_pfp_upload(file_storage, user_id):
         if not raw_bytes or len(raw_bytes) > 2 * 1024 * 1024:  # max 2MB
             return None
         
-        upload_dir = os.path.join(app.root_path, "static", "uploads", "pfp")
-        os.makedirs(upload_dir, exist_ok=True)
         filename = f"pfp_{user_id}_{int(datetime.now().timestamp())}.{ext}"
-        dest_path = os.path.join(upload_dir, filename)
-        with open(dest_path, "wb") as f:
-            f.write(raw_bytes)
+        try:
+            upload_dir = os.path.join(app.root_path, "static", "uploads", "pfp")
+            os.makedirs(upload_dir, exist_ok=True)
+            dest_path = os.path.join(upload_dir, filename)
+            with open(dest_path, "wb") as f:
+                f.write(raw_bytes)
+        except (OSError, IOError):
+            # In read-only serverless environment (e.g. Vercel), cache to /tmp
+            tmp_dir = os.path.join(tempfile.gettempdir(), "uploads", "pfp")
+            os.makedirs(tmp_dir, exist_ok=True)
+            with open(os.path.join(tmp_dir, filename), "wb") as f:
+                f.write(raw_bytes)
         
         return f"uploads/pfp/{filename}"
     except Exception as e:
@@ -414,16 +431,36 @@ def login():
 
 @app.route("/health")
 def health_diagnostic():
+    db_status = "connected"
+    db_error = None
+    try:
+        conn = db.get_db()
+        conn.execute("SELECT 1;").fetchone()
+        conn.close()
+    except Exception as e:
+        db_status = "error"
+        db_error = str(e)
+    
     login_path = os.path.join(app.template_folder, "login.html")
     templates_list = os.listdir(app.template_folder) if os.path.exists(app.template_folder) else []
+    platform = os.environ.get("DEPLOYMENT_PLATFORM", "vercel" if os.environ.get("VERCEL") == "1" else ("render" if (os.environ.get("RENDER") or os.environ.get("RENDER_SERVICE_ID")) else "local"))
+    
+    status_code = 200 if db_status == "connected" else 503
     return {
-        "status": "online",
-        "system": "Sabro Networks FTTH",
+        "status": "healthy" if db_status == "connected" else "degraded",
+        "platform": platform,
+        "system": "Sabro Networks ISP Management",
+        "database": {
+            "status": db_status,
+            "engine": db.get_storage_engine_name(),
+            "is_turso": db.is_turso(),
+            "error": db_error
+        },
         "base_dir": BASE_DIR,
         "template_folder": app.template_folder,
         "templates_found": len(templates_list),
         "login_html_exists": os.path.exists(login_path)
-    }
+    }, status_code
 
 @app.route("/logout")
 def logout():
