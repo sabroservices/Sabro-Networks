@@ -21,22 +21,12 @@ class VercelPathCorrectionMiddleware:
         self.wsgi_app = wsgi_app
 
     def __call__(self, environ, start_response):
-        path_info = environ.get("PATH_INFO", "")
-        forwarded_uri = (
-            environ.get("HTTP_X_FORWARDED_URI")
-            or environ.get("HTTP_X_REAL_PATH")
-            or environ.get("HTTP_X_VERCEL_PATH")
-            or environ.get("HTTP_X_MATCHED_PATH")
-        )
-        if forwarded_uri:
-            clean_path = forwarded_uri.split("?")[0]
-            environ["PATH_INFO"] = clean_path
-        elif path_info.startswith("/api/index.py"):
-            environ["PATH_INFO"] = path_info[len("/api/index.py"):] or "/"
-        elif path_info.startswith("/api/index"):
-            environ["PATH_INFO"] = path_info[len("/api/index"):] or "/"
-        elif path_info.startswith("/api"):
-            environ["PATH_INFO"] = path_info[len("/api"):] or "/"
+        path = environ.get("PATH_INFO", "")
+        # If Vercel passed entrypoint as path prefix, strip it cleanly
+        if path.startswith("/api/index.py"):
+            environ["PATH_INFO"] = path[len("/api/index.py"):] or "/"
+        elif path.startswith("/api/index"):
+            environ["PATH_INFO"] = path[len("/api/index"):] or "/"
 
         return self.wsgi_app(environ, start_response)
 

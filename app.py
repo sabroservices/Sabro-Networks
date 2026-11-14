@@ -336,8 +336,8 @@ def inject_globals():
 @app.before_request
 def require_login():
     # Explicitly whitelist public paths to prevent redirect loops behind reverse proxies (Vercel/Render)
-    raw_path = request.path.rstrip('/')
-    if raw_path in ('/login', '/health', '/customer/login') or raw_path.startswith('/static'):
+    raw_path = request.path
+    if '/login' in raw_path or '/health' in raw_path or raw_path.startswith('/static'):
         return None
     allowed_endpoints = ['login', 'static', 'print_invoice', 'health_diagnostic', 'customer_login', 'customer_logout', 'customer_dashboard', 'customer_invoices', 'customer_tickets', 'customer_new_ticket']
     if request.endpoint in allowed_endpoints:
