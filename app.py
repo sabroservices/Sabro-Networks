@@ -334,6 +334,22 @@ def inject_globals():
     )
 
 @app.before_request
+def vercel_debug_hook():
+    if request.path.startswith("/debug"):
+        return {
+            "path": request.path,
+            "endpoint": request.endpoint,
+            "environ_keys": list(request.environ.keys()),
+            "PATH_INFO": request.environ.get("PATH_INFO"),
+            "SCRIPT_NAME": request.environ.get("SCRIPT_NAME"),
+            "HTTP_X_FORWARDED_URI": request.environ.get("HTTP_X_FORWARDED_URI"),
+            "HTTP_X_REAL_PATH": request.environ.get("HTTP_X_REAL_PATH"),
+            "HTTP_X_VERCEL_PATH": request.environ.get("HTTP_X_VERCEL_PATH"),
+            "HTTP_X_MATCHED_PATH": request.environ.get("HTTP_X_MATCHED_PATH"),
+            "headers": dict(request.headers)
+        }
+
+@app.before_request
 def require_login():
     # Explicitly whitelist public paths to prevent redirect loops behind reverse proxies (Vercel/Render)
     raw_path = request.path
